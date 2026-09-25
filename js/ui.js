@@ -25,14 +25,17 @@ function locationRow(l){
 }
 
 function renderStats(){
-  const f = S.forecast, w = WEATHER[sim ? sim.weather : f.type];
-  const temp = sim ? sim.temp : f.temp + loc().bias;
   $('#stats').innerHTML = `
     <span class="stat"><small>Day</small>${S.day}${S.seasonDone ? '' : ' of ' + SEASON}</span>
-    <span class="stat"><small>Cash</small>${money(S.cash)}</span>
     <span class="stat"><small>Popularity</small>${S.pop}%<span class="meter"><i style="width:${S.pop}%"></i></span></span>
-    <span class="stat" title="${sim ? 'Today' : 'Forecast'}">${w.icon} ${temp}°C <small style="margin:0 0 0 4px">${sim ? 'today' : 'forecast'}</small></span>
     <button class="iconbtn" data-act="help">How to play</button>`;
+}
+function renderSceneStats(){
+  const f = S.forecast, w = WEATHER[sim ? sim.weather : f.type];
+  const temp = sim ? sim.temp : f.temp + loc().bias;
+  $('#sceneStats').innerHTML = `
+    <span class="scene-badge weather">${w.icon} ${temp}°C</span>
+    <span class="scene-badge cash">${money(S.cash)}</span>`;
 }
 function renderBoard(){
   const el = $('#board');
@@ -215,7 +218,7 @@ function showSeason(){
   showModal(html);
 }
 
-function renderAll(){ renderStats(); renderBoard(); }
+function renderAll(){ renderStats(); renderSceneStats(); renderBoard(); }
 
 function showModal(html){ $('#card').innerHTML = html; $('#modal').classList.add('on'); const b = $('#card button'); if (b) b.focus(); }
 function hideModal(){ $('#modal').classList.remove('on'); $('#card').classList.remove('wide'); }

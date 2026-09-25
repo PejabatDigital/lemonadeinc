@@ -348,17 +348,6 @@ function drawStand(t){
     ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.moveTo(px-18, 168); ctx.quadraticCurveTo(px, 118, px+18, 168); ctx.fill();
     for (let i = -2; i <= 2; i++) circ(px + i*21, 172, 4, i % 2 ? '#FFFFFF' : '#E8574A');
   }
-  // price board
-  const bx = x - 150, big = !!S.upg.sign;
-  shadowAt(bx, 302, 30, 4, .2);
-  ctx.fillStyle = '#7A4726'; ctx.fillRect(bx-24, 250, 5, 52); ctx.fillRect(bx+19, 250, 5, 52);
-  ctx.fillStyle = 'rgba(0,0,0,.2)'; rr(bx-28, (big ? 196 : 214) + 3, 60, big ? 62 : 44, 6); ctx.fill();
-  ctx.fillStyle = big ? '#E8574A' : '#2C3B33'; rr(bx-30, big ? 196 : 214, 60, big ? 62 : 44, 6); ctx.fill();
-  ctx.strokeStyle = big ? '#FFD93B' : '#8A6238'; ctx.lineWidth = 3; rr(bx-30, big ? 196 : 214, 60, big ? 62 : 44, 6); ctx.stroke();
-  ctx.fillStyle = '#FFFFFF'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  if (big) { ctx.font = '800 11px Nunito, system-ui, sans-serif'; ctx.fillText('ICE COLD', bx, 210); }
-  ctx.font = `800 ${big ? 22 : 18}px "Baloo 2", system-ui, sans-serif`;
-  ctx.fillText(money(S.recipe.price), bx, big ? 234 : 236);
 }
 
 const BODY = ['#E8574A','#4C7FD1','#2F8A3E','#8E5CC4','#F09A3E','#2BA3A3','#D65A9A','#5B6B73','#E0C341'];
