@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Lemonade Inc.">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#FFD93B">
+<meta name="description" content="Run a lemonade stand: buy supplies, perfect your recipe, watch the weather and grow Lemonade Inc.">
+<title>Lemonade Inc.</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1 class="brand"><span>🍋</span> Lemonade Inc.</h1>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <div class="scene">
+    <canvas id="cv" width="960" height="440" aria-label="Your lemonade stand"></canvas>
+    <div class="hud" id="hud">
+      <div class="clock" id="clock">9:00 am</div>
+      <div class="speeds">
+        <button data-act="speed:1" aria-pressed="true">1×</button>
+        <button data-act="speed:2" aria-pressed="false">2×</button>
+        <button data-act="speed:4" aria-pressed="false">4×</button>
+        <button data-act="close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <section class="board"><div class="chalk" id="board"></div></section>
+</div>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true"><div class="card" id="card"></div></div>
+
+<script src="js/config.js"></script>
+<script src="js/state.js"></script>
+<script src="js/render.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

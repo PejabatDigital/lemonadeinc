@@ -1,0 +1,9 @@
+# Plain static site: no build step, publish the repo root.
+[build]
+  publish = "."
+
+# Make sure browsers always check for a new service worker.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
