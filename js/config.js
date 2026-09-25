@@ -4,6 +4,7 @@
 
 const W = 960, H = 440, STAND_X = 480, QY = 392, DAY_MIN = 540, SEASON = 30;
 const SAVE_KEY = 'sunny-squeeze-save-v1';
+const VERSION = '1.0.0';
 
 const LOCS = [
   { id:'lane', name:'Maple Lane', rent:0, traffic:70, tol:0.75, need:0, bias:0, desc:'A quiet street. Free to set up.' },

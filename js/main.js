@@ -21,6 +21,7 @@ function frame(ts){
 S = load() || newState();
 resize();
 renderAll();
+$('#verline').textContent = 'Version ' + VERSION;
 if (!S.seenHelp) showHelp();
 requestAnimationFrame(frame);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => {});

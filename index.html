@@ -23,6 +23,7 @@
   <header class="top">
     <h1 class="brand"><span>🍋</span> Lemonade Inc.</h1>
     <div class="stats" id="stats"></div>
+    <button class="menubtn" data-act="menu" aria-label="Menu">☰</button>
   </header>
 
   <div class="scene">
@@ -42,6 +43,15 @@
 </div>
 
 <div class="modal" id="modal" role="dialog" aria-modal="true"><div class="card" id="card"></div></div>
+
+<div class="scrim" data-act="closemenu"></div>
+<aside class="drawer" id="drawer">
+  <button class="drawer-close" data-act="closemenu" aria-label="Close menu">✕</button>
+  <nav class="drawer-nav">
+    <button class="drawer-link" data-act="help">How to play</button>
+  </nav>
+  <p class="drawer-version" id="verline"></p>
+</aside>
 
 <script src="js/config.js"></script>
 <script src="js/state.js"></script>

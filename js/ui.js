@@ -3,6 +3,27 @@
 'use strict';
 
 // ---------- UI ----------
+const mobileMQ = window.matchMedia('(max-width:560px)');
+const isMobile = () => mobileMQ.matches;
+mobileMQ.addEventListener('change', () => renderBoard());
+
+function supplyRow(k){
+  const it = SHOP[k], fresh = S.lemons.filter(b => b.age === 3).reduce((a,b) => a+b.n, 0);
+  const have = k === 'lemons' ? lemonCount() : S[k];
+  const extra = k === 'lemons' && fresh ? ` <span class="warn">${fresh} go bad tonight.</span>` : '';
+  return `<div class="row"><div><h3>${it.icon} ${it.name}: ${have}</h3><p>${it.note}${extra}</p></div>
+    <div class="packs">${it.packs.map(([n,p],i) => `<button class="pack" data-act="buy:${k}:${i}" ${S.cash < p ? 'disabled' : ''}>Buy ${n}<small>${money(p)}</small></button>`).join('')}</div></div>`;
+}
+function upgradeRow(u){
+  return `<div class="row"><div><h3>${u.icon} ${u.name}</h3><p>${u.desc}</p></div>
+    <div>${S.upg[u.id] ? '<span class="owned">Owned</span>' : `<button class="pack" data-act="upg:${u.id}" ${S.cash < u.cost ? 'disabled' : ''}>Buy<small>${money(u.cost)}</small></button>`}</div></div>`;
+}
+function locationRow(l){
+  const locked = S.pop < l.need, here = S.loc === l.id;
+  return `<div class="row"><div><h3>${l.name}</h3><p>${l.desc} Rent ${l.rent ? money(l.rent) + ' a day' : 'free'}.${locked ? ` <span class="warn">Needs ${l.need}% popularity.</span>` : ''}</p></div>
+    <div>${here ? '<span class="owned">You are here</span>' : `<button class="pack" data-act="loc:${l.id}" ${locked ? 'disabled' : ''}>Move here</button>`}</div></div>`;
+}
+
 function renderStats(){
   const f = S.forecast, w = WEATHER[sim ? sim.weather : f.type];
   const temp = sim ? sim.temp : f.temp + loc().bias;
@@ -30,13 +51,12 @@ function renderBoard(){
   const tabs = [['supplies','Supplies'],['recipe','Recipe'],['upgrades','Upgrades'],['spot','Location'],['books','Books']];
   let body = '';
   if (tab === 'supplies') {
-    const fresh = S.lemons.filter(b => b.age === 3).reduce((a,b) => a+b.n, 0);
-    body = Object.entries(SHOP).map(([k,it]) => {
-      const have = k === 'lemons' ? lemonCount() : S[k];
-      const extra = k === 'lemons' && fresh ? ` <span class="warn">${fresh} go bad tonight.</span>` : '';
-      return `<div class="row"><div><h3>${it.icon} ${it.name}: ${have}</h3><p>${it.note}${extra}</p></div>
-        <div class="packs">${it.packs.map(([n,p],i) => `<button class="pack" data-act="buy:${k}:${i}" ${S.cash < p ? 'disabled' : ''}>Buy ${n}<small>${money(p)}</small></button>`).join('')}</div></div>`;
-    }).join('');
+    if (isMobile()) {
+      const chips = Object.entries(SHOP).map(([k,it]) => `<button class="chip" data-act="sel:sup:${k}" aria-pressed="${supplyItem===k}" aria-label="${it.name}">${it.icon}</button>`).join('');
+      body = `<div class="chips">${chips}</div>` + supplyRow(SHOP[supplyItem] ? supplyItem : 'lemons');
+    } else {
+      body = Object.keys(SHOP).map(supplyRow).join('');
+    }
   } else if (tab === 'recipe') {
     const r = S.recipe, st = (key, label, note, val) => `<div class="row"><div><h3>${label}</h3><p>${note}</p></div>
       <div class="step"><button data-act="rec:${key}:-1" aria-label="Less ${label}">−</button><output>${val}</output><button data-act="rec:${key}:1" aria-label="More ${label}">+</button></div></div>`;
@@ -46,16 +66,21 @@ function renderBoard(){
       + st('price','Price per cup','Pricier spots and hotter days let you charge more.', money(r.price));
     body = costPanel() + body;
   } else if (tab === 'upgrades') {
-    body = UPG.map(u => `<div class="row"><div><h3>${u.icon} ${u.name}</h3><p>${u.desc}</p></div>
-      <div>${S.upg[u.id] ? '<span class="owned">Owned</span>' : `<button class="pack" data-act="upg:${u.id}" ${S.cash < u.cost ? 'disabled' : ''}>Buy<small>${money(u.cost)}</small></button>`}</div></div>`).join('');
+    if (isMobile()) {
+      const chips = UPG.map(u => `<button class="chip" data-act="sel:upg:${u.id}" aria-pressed="${upgId===u.id}">${u.icon} ${u.name}</button>`).join('');
+      body = `<div class="chips">${chips}</div>` + upgradeRow(UPG.find(x => x.id === upgId) || UPG[0]);
+    } else {
+      body = UPG.map(upgradeRow).join('');
+    }
   } else if (tab === 'books') {
     body = renderBooks();
   } else {
-    body = LOCS.map(l => {
-      const locked = S.pop < l.need, here = S.loc === l.id;
-      return `<div class="row"><div><h3>${l.name}</h3><p>${l.desc} Rent ${l.rent ? money(l.rent) + ' a day' : 'free'}.${locked ? ` <span class="warn">Needs ${l.need}% popularity.</span>` : ''}</p></div>
-        <div>${here ? '<span class="owned">You are here</span>' : `<button class="pack" data-act="loc:${l.id}" ${locked ? 'disabled' : ''}>Move here</button>`}</div></div>`;
-    }).join('');
+    if (isMobile()) {
+      const chips = LOCS.map(l => `<button class="chip" data-act="sel:loc:${l.id}" aria-pressed="${locId===l.id}">${l.name}</button>`).join('');
+      body = `<div class="chips">${chips}</div>` + locationRow(LOCS.find(x => x.id === locId) || LOCS[0]);
+    } else {
+      body = LOCS.map(locationRow).join('');
+    }
   }
   const ready = cupsReady(), L = loc();
   let msg = `Ready to sell about ${ready} cups at ${L.name}.`;
@@ -246,10 +271,19 @@ function showHelp(){
     <button class="ghost" data-act="newgame">Restart from day 1</button>`);
 }
 
+function showDrawer(){ $('#drawer').classList.add('on'); $('.scrim').classList.add('on'); }
+function hideDrawer(){ $('#drawer').classList.remove('on'); $('.scrim').classList.remove('on'); }
+
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
   const [act, a, c] = b.dataset.act.split(':');
   if (act === 'tab') { tab = a; renderBoard(); return; }
+  if (act === 'menu') { showDrawer(); return; }
+  if (act === 'closemenu') { hideDrawer(); return; }
+  if (act === 'sel') {
+    if (a === 'sup') supplyItem = c; else if (a === 'upg') upgId = c; else if (a === 'loc') locId = c;
+    renderBoard(); return;
+  }
   if (act === 'buy') {
     const [n, p] = SHOP[a].packs[+c]; if (S.cash < p) return;
     const have = haveOf(a); S.cost[a] = (have * S.cost[a] + p) / (have + n);
@@ -270,7 +304,7 @@ document.addEventListener('click', e => {
   if (act === 'speed') { setSpeed(+a); return; }
   if (act === 'close') { if (sim) sim.min = DAY_MIN; return; }
   if (act === 'next') { hideModal(); tab = 'supplies'; renderAll(); return; }
-  if (act === 'help') { showHelp(); return; }
+  if (act === 'help') { hideDrawer(); showHelp(); return; }
   if (act === 'season') { showSeason(); return; }
   if (act === 'closemodal') { hideModal(); renderAll(); return; }
   if (act === 'closehelp') { S.seenHelp = true; save(); hideModal(); return; }

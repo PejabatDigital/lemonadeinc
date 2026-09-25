@@ -6,8 +6,13 @@
 const cv = $('#cv'), ctx = cv.getContext('2d');
 function resize(){
   const r = cv.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2);
-  cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.width * dpr * H / W);
-  ctx.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0);
+  cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+  // "Cover" the box with the fixed W×H scene, cropping the overflow rather than letterboxing.
+  // On the box's native 960:440 ratio this reduces to the old fit-exactly behaviour (no overflow).
+  const scale = Math.max(r.width / W, r.height / H);
+  const ox = (r.width - W * scale) / 2;
+  const oy = -(H * scale - r.height) * 0.65; // bias the crop toward the lower half, where the stand sits
+  ctx.setTransform(scale * dpr, 0, 0, scale * dpr, ox * dpr, oy * dpr);
 }
 window.addEventListener('resize', resize);
 
