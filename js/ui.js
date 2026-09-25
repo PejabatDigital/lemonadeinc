@@ -18,6 +18,15 @@ function upgradeRow(u){
   return `<div class="row"><div><h3>${u.icon} ${u.name}</h3><p>${u.desc}</p></div>
     <div>${S.upg[u.id] ? '<span class="owned">Owned</span>' : `<button class="pack" data-act="upg:${u.id}" ${S.cash < u.cost ? 'disabled' : ''}>Buy<small>${money(u.cost)}</small></button>`}</div></div>`;
 }
+const TAB_INFO = {
+  supplies: { title:'Supplies', desc:'Stock up on lemons, sugar, ice and cups before you open.' },
+  recipe:   { title:'Recipe', desc:'Balance your ingredients — the Recipe tab shows your cost per cup.' },
+  price:    { title:'Price', desc:'Set your price. Pricier spots and hotter days let you charge more.' },
+  upgrades: { title:'Upgrades', desc:'One-time purchases that make your stand run better.' },
+  spot:     { title:'Location', desc:'Move to busier spots as your popularity grows.' },
+  books:    { title:'Books', desc:'Track your daily sales and season-long performance.' },
+};
+
 function locationRow(l){
   const locked = S.pop < l.need, here = S.loc === l.id;
   return `<div class="row"><div><h3>${l.name}</h3><p>${l.desc} Rent ${l.rent ? money(l.rent) + ' a day' : 'free'}.${locked ? ` <span class="warn">Needs ${l.need}% popularity.</span>` : ''}</p></div>
@@ -39,6 +48,7 @@ function renderSceneStats(){
 }
 function renderBoard(){
   const el = $('#board');
+  $('#openBar').classList.toggle('on', !sim);
   if (sim) {
     const st = sim.stats;
     el.innerHTML = `<div class="live">
@@ -51,7 +61,9 @@ function renderBoard(){
       </div>${sim.soldOut ? `<p class="warn" style="margin:12px 0 0;font-weight:800">Out of ${sim.soldOut}! Customers are being turned away. Close early to restock tomorrow.</p>` : ''}`;
     return;
   }
-  const tabs = [['supplies','Supplies'],['recipe','Recipe'],['upgrades','Upgrades'],['spot','Location'],['books','Books']];
+  const tabs = [['supplies','Supplies'],['recipe','Recipe'],['price','Price'],['upgrades','Upgrades'],['spot','Location'],['books','Books']];
+  const recStep = (key, label, note, val) => `<div class="row"><div><h3>${label}</h3><p>${note}</p></div>
+    <div class="step"><button data-act="rec:${key}:-1" aria-label="Less ${label}">−</button><output>${val}</output><button data-act="rec:${key}:1" aria-label="More ${label}">+</button></div></div>`;
   let body = '';
   if (tab === 'supplies') {
     if (isMobile()) {
@@ -61,13 +73,13 @@ function renderBoard(){
       body = Object.keys(SHOP).map(supplyRow).join('');
     }
   } else if (tab === 'recipe') {
-    const r = S.recipe, st = (key, label, note, val) => `<div class="row"><div><h3>${label}</h3><p>${note}</p></div>
-      <div class="step"><button data-act="rec:${key}:-1" aria-label="Less ${label}">−</button><output>${val}</output><button data-act="rec:${key}:1" aria-label="More ${label}">+</button></div></div>`;
-    body = st('l','Lemons per pitcher',`One pitcher fills ${yieldCups()} cups.`, r.l)
-      + st('s','Sugar per pitcher','Cups of sugar. Balance it against the lemons.', r.s)
-      + st('i','Ice per cup','Hotter days call for more ice.', r.i)
-      + st('price','Price per cup','Pricier spots and hotter days let you charge more.', money(r.price));
-    body = costPanel() + body;
+    const r = S.recipe;
+    body = recipeCostPanel()
+      + recStep('l','Lemons per pitcher',`One pitcher fills ${yieldCups()} cups.`, r.l)
+      + recStep('s','Sugar per pitcher','Cups of sugar. Balance it against the lemons.', r.s)
+      + recStep('i','Ice per cup','Hotter days call for more ice.', r.i);
+  } else if (tab === 'price') {
+    body = pricePanel() + recStep('price','Price per cup','Pricier spots and hotter days let you charge more.', money(S.recipe.price));
   } else if (tab === 'upgrades') {
     if (isMobile()) {
       const chips = UPG.map(u => `<button class="chip" data-act="sel:upg:${u.id}" aria-pressed="${upgId===u.id}">${u.icon} ${u.name}</button>`).join('');
@@ -91,23 +103,33 @@ function renderBoard(){
   if (S.cash < L.rent) msg = `You need ${money(L.rent)} for rent here. Move somewhere cheaper.`;
   else if (!ready) msg = S.cups ? 'Not enough lemons or sugar for one pitcher.' : 'You have no cups. Buy some before opening.';
   else if (S.ice < S.recipe.i * Math.min(ready, 20)) msg += ' You are short on ice.';
+  const info = TAB_INFO[tab];
   el.innerHTML = `<div class="tabs" role="tablist">${tabs.map(([k,n]) => `<button role="tab" aria-selected="${tab===k}" data-act="tab:${k}">${n}</button>`).join('')}</div>
-    <div class="rows">${body}</div>
-    <div class="go"><p>${msg}</p><button class="open" data-act="open" ${S.cash < L.rent ? 'disabled' : ''}>Open stand</button></div>`;
+    <h2 class="panel-title">${info.title}</h2>
+    <p class="panel-desc">${info.desc}</p>
+    <div class="panel"><div class="rows">${body}</div></div>
+    <div class="go"><p>${msg}</p></div>`;
+  $('#openBar').innerHTML = `<button class="open" data-act="open" ${S.cash < L.rent ? 'disabled' : ''}>Open stand</button>`;
 }
-function costPanel(){
-  const c = cupCost(), r = S.recipe, m = r.price - c.total, pct = r.price ? m / r.price * 100 : 0, L = loc();
-  const be = L.rent ? (m > 0 ? `${Math.ceil(L.rent / m)} cups to cover rent` : 'Not possible at this price') : 'No rent here';
+function recipeCostPanel(){
+  const c = cupCost();
   return `<div><dl class="cost">
     <dt>🍋 Lemons</dt><dd>${cents(c.lemons)}</dd>
     <dt>🍬 Sugar</dt><dd>${cents(c.sugar)}</dd>
     <dt>🧊 Ice</dt><dd>${cents(c.ice)}</dd>
     <dt>🥤 Cup</dt><dd>${cents(c.cups)}</dd>
     <dt class="sum">Cost per cup</dt><dd class="sum">${cents(c.total)}</dd>
+  </dl><p class="note">Costs use the average price you paid for the stock you hold. Items you don't have yet use the smallest-pack price.</p></div>`;
+}
+function pricePanel(){
+  const c = cupCost(), r = S.recipe, m = r.price - c.total, pct = r.price ? m / r.price * 100 : 0, L = loc();
+  const be = L.rent ? (m > 0 ? `${Math.ceil(L.rent / m)} cups to cover rent` : 'Not possible at this price') : 'No rent here';
+  return `<div><dl class="cost">
+    <dt>Cost per cup</dt><dd>${cents(c.total)}</dd>
     <dt>Price</dt><dd>${cents(r.price)}</dd>
     <dt>Margin per cup</dt><dd class="${m > 0 ? 'good' : 'badc'}">${cents(m)} (${pct.toFixed(0)}%)</dd>
     <dt>Break-even at ${L.name}</dt><dd>${be}</dd>
-  </dl><p class="note">Costs use the average price you paid for the stock you hold. Items you don't have yet use the smallest-pack price.</p></div>`;
+  </dl></div>`;
 }
 
 function svgBars(vals, labels, fmt){
