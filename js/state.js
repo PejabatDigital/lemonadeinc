@@ -4,7 +4,7 @@
 
 // ---------- state ----------
 let S, sim = null, tab = 'supplies', report = null;
-let supplyItem = 'lemons', upgId = UPG[0].id, locId = LOCS[0].id;
+let supplyItem = 'lemons';
 
 function genForecast(){
   let r = Math.random(), i = 0;

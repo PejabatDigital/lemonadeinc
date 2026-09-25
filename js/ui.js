@@ -20,10 +20,8 @@ function upgradeRow(u){
 }
 const TAB_INFO = {
   supplies: { title:'Supplies', desc:'Stock up on lemons, sugar, ice and cups before you open.' },
-  recipe:   { title:'Recipe', desc:'Balance your ingredients — the Recipe tab shows your cost per cup.' },
+  recipe:   { title:'Recipe', desc:'Balance your ingredients to find the best-tasting lemonade.' },
   price:    { title:'Price', desc:'Set your price. Pricier spots and hotter days let you charge more.' },
-  upgrades: { title:'Upgrades', desc:'One-time purchases that make your stand run better.' },
-  spot:     { title:'Location', desc:'Move to busier spots as your popularity grows.' },
   books:    { title:'Books', desc:'Track your daily sales and season-long performance.' },
 };
 
@@ -36,8 +34,7 @@ function locationRow(l){
 function renderStats(){
   $('#stats').innerHTML = `
     <span class="stat"><small>Day</small>${S.day}${S.seasonDone ? '' : ' of ' + SEASON}</span>
-    <span class="stat"><small>Popularity</small>${S.pop}%<span class="meter"><i style="width:${S.pop}%"></i></span></span>
-    <button class="iconbtn" data-act="help">How to play</button>`;
+    <span class="stat"><small>Popularity</small>${S.pop}%<span class="meter"><i style="width:${S.pop}%"></i></span></span>`;
 }
 function renderSceneStats(){
   const f = S.forecast, w = WEATHER[sim ? sim.weather : f.type];
@@ -61,7 +58,7 @@ function renderBoard(){
       </div>${sim.soldOut ? `<p class="warn" style="margin:12px 0 0;font-weight:800">Out of ${sim.soldOut}! Customers are being turned away. Close early to restock tomorrow.</p>` : ''}`;
     return;
   }
-  const tabs = [['supplies','Supplies'],['recipe','Recipe'],['price','Price'],['upgrades','Upgrades'],['spot','Location'],['books','Books']];
+  const tabs = [['supplies','Supplies'],['recipe','Recipe'],['price','Price'],['books','Books']];
   const recStep = (key, label, note, val) => `<div class="row"><div><h3>${label}</h3><p>${note}</p></div>
     <div class="step"><button data-act="rec:${key}:-1" aria-label="Less ${label}">−</button><output>${val}</output><button data-act="rec:${key}:1" aria-label="More ${label}">+</button></div></div>`;
   let body = '';
@@ -74,28 +71,13 @@ function renderBoard(){
     }
   } else if (tab === 'recipe') {
     const r = S.recipe;
-    body = recipeCostPanel()
-      + recStep('l','Lemons per pitcher',`One pitcher fills ${yieldCups()} cups.`, r.l)
+    body = recStep('l','Lemons per pitcher',`One pitcher fills ${yieldCups()} cups.`, r.l)
       + recStep('s','Sugar per pitcher','Cups of sugar. Balance it against the lemons.', r.s)
       + recStep('i','Ice per cup','Hotter days call for more ice.', r.i);
   } else if (tab === 'price') {
     body = pricePanel() + recStep('price','Price per cup','Pricier spots and hotter days let you charge more.', money(S.recipe.price));
-  } else if (tab === 'upgrades') {
-    if (isMobile()) {
-      const chips = UPG.map(u => `<button class="chip" data-act="sel:upg:${u.id}" aria-pressed="${upgId===u.id}">${u.icon} ${u.name}</button>`).join('');
-      body = `<div class="chips">${chips}</div>` + upgradeRow(UPG.find(x => x.id === upgId) || UPG[0]);
-    } else {
-      body = UPG.map(upgradeRow).join('');
-    }
-  } else if (tab === 'books') {
-    body = renderBooks();
   } else {
-    if (isMobile()) {
-      const chips = LOCS.map(l => `<button class="chip" data-act="sel:loc:${l.id}" aria-pressed="${locId===l.id}">${l.name}</button>`).join('');
-      body = `<div class="chips">${chips}</div>` + locationRow(LOCS.find(x => x.id === locId) || LOCS[0]);
-    } else {
-      body = LOCS.map(locationRow).join('');
-    }
+    body = renderBooks();
   }
   const ready = cupsReady(), L = loc();
   let msg = `Ready to sell about ${ready} cups at ${L.name}.`;
@@ -109,17 +91,8 @@ function renderBoard(){
     <p class="panel-desc">${info.desc}</p>
     <div class="panel"><div class="rows">${body}</div></div>
     <div class="go"><p>${msg}</p></div>`;
-  $('#openBar').innerHTML = `<button class="open" data-act="open" ${S.cash < L.rent ? 'disabled' : ''}>Open stand</button>`;
-}
-function recipeCostPanel(){
-  const c = cupCost();
-  return `<div><dl class="cost">
-    <dt>🍋 Lemons</dt><dd>${cents(c.lemons)}</dd>
-    <dt>🍬 Sugar</dt><dd>${cents(c.sugar)}</dd>
-    <dt>🧊 Ice</dt><dd>${cents(c.ice)}</dd>
-    <dt>🥤 Cup</dt><dd>${cents(c.cups)}</dd>
-    <dt class="sum">Cost per cup</dt><dd class="sum">${cents(c.total)}</dd>
-  </dl><p class="note">Costs use the average price you paid for the stock you hold. Items you don't have yet use the smallest-pack price.</p></div>`;
+  $('#openBar').innerHTML = `<button class="loc-badge" data-act="showloc">📍 ${L.name}</button>
+    <button class="open" data-act="open" ${S.cash < L.rent ? 'disabled' : ''}>Open stand</button>`;
 }
 function pricePanel(){
   const c = cupCost(), r = S.recipe, m = r.price - c.total, pct = r.price ? m / r.price * 100 : 0, L = loc();
@@ -296,6 +269,20 @@ function showHelp(){
     <button class="ghost" data-act="newgame">Restart from day 1</button>`);
 }
 
+function showShop(){
+  hideDrawer();
+  $('#card').classList.add('wide');
+  showModal(`<h2>Shop</h2><p class="sub">One-time upgrades that make your stand run better.</p>
+    <div class="chalk"><div class="rows">${UPG.map(upgradeRow).join('')}</div></div>
+    <button class="open" data-act="closemodal">Back to the stand</button>`);
+}
+function showLocations(){
+  $('#card').classList.add('wide');
+  showModal(`<h2>Location</h2><p class="sub">Move to busier spots as your popularity grows.</p>
+    <div class="chalk"><div class="rows">${LOCS.map(locationRow).join('')}</div></div>
+    <button class="open" data-act="closemodal">Back to the stand</button>`);
+}
+
 function showDrawer(){ $('#drawer').classList.add('on'); $('.scrim').classList.add('on'); }
 function hideDrawer(){ $('#drawer').classList.remove('on'); $('.scrim').classList.remove('on'); }
 
@@ -305,10 +292,9 @@ document.addEventListener('click', e => {
   if (act === 'tab') { tab = a; renderBoard(); return; }
   if (act === 'menu') { showDrawer(); return; }
   if (act === 'closemenu') { hideDrawer(); return; }
-  if (act === 'sel') {
-    if (a === 'sup') supplyItem = c; else if (a === 'upg') upgId = c; else if (a === 'loc') locId = c;
-    renderBoard(); return;
-  }
+  if (act === 'sel') { supplyItem = c; renderBoard(); return; }
+  if (act === 'showloc') { showLocations(); return; }
+  if (act === 'shop') { showShop(); return; }
   if (act === 'buy') {
     const [n, p] = SHOP[a].packs[+c]; if (S.cash < p) return;
     const have = haveOf(a); S.cost[a] = (have * S.cost[a] + p) / (have + n);
@@ -323,8 +309,8 @@ document.addEventListener('click', e => {
     else r[a] = clamp(r[a] + d, 0, a === 'i' ? 8 : 10);
     save(); renderAll(); return;
   }
-  if (act === 'upg') { const u = UPG.find(x => x.id === a); if (S.cash >= u.cost && !S.upg[a]) { S.cash -= u.cost; S.capex = (S.capex || 0) + u.cost; S.upg[a] = true; S.upgLog[a] = { cost:u.cost, day:S.day }; save(); renderAll(); } return; }
-  if (act === 'loc') { S.loc = a; save(); renderAll(); return; }
+  if (act === 'upg') { const u = UPG.find(x => x.id === a); if (S.cash >= u.cost && !S.upg[a]) { S.cash -= u.cost; S.capex = (S.capex || 0) + u.cost; S.upg[a] = true; S.upgLog[a] = { cost:u.cost, day:S.day }; save(); renderAll(); showShop(); } return; }
+  if (act === 'loc') { S.loc = a; save(); renderAll(); hideModal(); return; }
   if (act === 'open') { openStand(); return; }
   if (act === 'speed') { setSpeed(+a); return; }
   if (act === 'close') { if (sim) sim.min = DAY_MIN; return; }
