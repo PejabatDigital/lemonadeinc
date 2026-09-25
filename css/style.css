@@ -54,10 +54,9 @@ canvas{ display:block; width:100%; height:100%; }
 /* board */
 .board{ margin-top:14px; background:var(--wood); border-radius:18px; padding:10px; box-shadow:inset 0 0 0 3px var(--wood-dark); }
 .chalk{ background:var(--chalk); color:var(--chalk-ink); border-radius:12px; padding:14px; }
-.tabs{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
-.tabs button{ background:transparent; border:2px solid var(--chalk-soft); color:var(--chalk-ink); border-radius:10px; padding:7px 14px; font-weight:800; }
+.tabs{ display:flex; gap:5px; flex-wrap:wrap; padding-bottom:12px; margin-bottom:12px; border-bottom:2px solid rgba(242,246,236,.18); }
+.tabs button{ background:transparent; border:2px solid var(--chalk-soft); color:var(--chalk-ink); border-radius:10px; padding:6px 11px; font-size:14px; font-weight:800; }
 .tabs button[aria-selected="true"]{ background:var(--chalk-ink); color:var(--chalk); border-color:var(--chalk-ink); }
-.panel-title{ font-family:"Baloo 2", system-ui, sans-serif; font-style:italic; font-size:21px; font-weight:800; margin:0 0 2px; }
 .panel-desc{ margin:0 0 12px; color:var(--chalk-soft); font-size:14px; line-height:1.4; }
 .panel{ background:rgba(242,246,236,.05); border:2px solid rgba(242,246,236,.14); border-radius:14px; padding:14px; }
 .rows{ display:grid; gap:10px; }

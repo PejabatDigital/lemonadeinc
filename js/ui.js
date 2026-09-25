@@ -19,10 +19,10 @@ function upgradeRow(u){
     <div>${S.upg[u.id] ? '<span class="owned">Owned</span>' : `<button class="pack" data-act="upg:${u.id}" ${S.cash < u.cost ? 'disabled' : ''}>Buy<small>${money(u.cost)}</small></button>`}</div></div>`;
 }
 const TAB_INFO = {
-  supplies: { title:'Supplies', desc:'Stock up on lemons, sugar, ice and cups before you open.' },
-  recipe:   { title:'Recipe', desc:'Balance your ingredients to find the best-tasting lemonade.' },
-  price:    { title:'Price', desc:'Set your price. Pricier spots and hotter days let you charge more.' },
-  books:    { title:'Books', desc:'Track your daily sales and season-long performance.' },
+  supplies: 'Stock up on lemons, sugar, ice and cups before you open.',
+  recipe:   'Balance your ingredients to find the best-tasting lemonade.',
+  price:    'Set your price. Pricier spots and hotter days let you charge more.',
+  books:    'Track your daily sales and season-long performance.',
 };
 
 function locationRow(l){
@@ -85,10 +85,8 @@ function renderBoard(){
   if (S.cash < L.rent) msg = `You need ${money(L.rent)} for rent here. Move somewhere cheaper.`;
   else if (!ready) msg = S.cups ? 'Not enough lemons or sugar for one pitcher.' : 'You have no cups. Buy some before opening.';
   else if (S.ice < S.recipe.i * Math.min(ready, 20)) msg += ' You are short on ice.';
-  const info = TAB_INFO[tab];
   el.innerHTML = `<div class="tabs" role="tablist">${tabs.map(([k,n]) => `<button role="tab" aria-selected="${tab===k}" data-act="tab:${k}">${n}</button>`).join('')}</div>
-    <h2 class="panel-title">${info.title}</h2>
-    <p class="panel-desc">${info.desc}</p>
+    <p class="panel-desc">${TAB_INFO[tab]}</p>
     <div class="panel"><div class="rows">${body}</div></div>
     <div class="go"><p>${msg}</p></div>`;
   $('#openBar').innerHTML = `<button class="loc-badge" data-act="showloc">📍 ${L.name}</button>
