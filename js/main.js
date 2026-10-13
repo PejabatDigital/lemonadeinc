@@ -24,7 +24,6 @@ renderAll();
 $('#verline').textContent = 'Version ' + VERSION;
 if (!S.seenHelp) showHelp();
 requestAnimationFrame(frame);
-if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => {});
 
 // Offline support (only when served over http/https, not when opened as a local file)
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {

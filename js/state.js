@@ -15,16 +15,18 @@ function genForecast(){
 function newState(){
   return { v:1, day:1, cash:20, pop:10, lemons:[], sugar:0, ice:0, cups:0,
     recipe:{ l:4, s:4, i:3, price:0.40 }, loc:'lane', upg:{}, forecast:genForecast(),
-    spend:0, total:0, best:null, seasonDone:false, notes:[], seenHelp:false,
+    spend:0, total:0, seasonDone:false, seenHelp:false,
     cost:Object.fromEntries(Object.keys(SHOP).map(k => [k, refCost(k)])), ledger:[], upgLog:{}, capex:0 };
 }
-function save(){ try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch(e){} }
+// Only save between days: a mid-day save would store rent and sales without the day's ledger row.
+function save(){ if (sim) return; try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch(e){} }
 function load(){
   try { const raw = localStorage.getItem(SAVE_KEY); if (raw) { const d = JSON.parse(raw); if (d && d.v === 1) return normalize(d); } } catch(e){}
   return null;
 }
 const lemonCount = () => S.lemons.reduce((a,b) => a + b.n, 0);
-const loc = () => LOCS.find(l => l.id === S.loc) || LOCS[0];
+const locById = id => LOCS.find(l => l.id === id) || LOCS[0];
+const loc = () => locById(S.loc);
 const yieldCups = () => S.upg.juicer ? 15 : 12;
 const idealIce = t => t >= 33 ? 5 : t >= 29 ? 4 : t >= 24 ? 3 : t >= 19 ? 2 : 1;
 const refCost = k => SHOP[k].packs[0][1] / SHOP[k].packs[0][0];
@@ -32,6 +34,7 @@ const haveOf = k => k === 'lemons' ? lemonCount() : S[k];
 const unitCost = k => haveOf(k) > 0 ? S.cost[k] : refCost(k);
 const cents = n => Math.abs(n) < 1 ? (n < 0 ? '-' : '') + (Math.abs(n)*100).toFixed(1) + '¢' : money(n);
 const sum = (arr, f) => arr.reduce((a, x) => a + f(x), 0);
+const addCash = d => { S.cash = Math.round((S.cash + d) * 100) / 100; }; // keep cash in whole cents
 function cupCost(){
   const { l, s, i } = S.recipe, y = yieldCups();
   const c = { lemons:l*unitCost('lemons')/y, sugar:s*unitCost('sugar')/y, ice:i*unitCost('ice'), cups:unitCost('cups') };

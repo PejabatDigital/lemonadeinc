@@ -11,7 +11,7 @@ function openStand(){
   if (Math.random() > 0.75) { const i = WORDER.indexOf(type); type = WORDER[clamp(i + (Math.random() < .5 ? -1 : 1), 0, WORDER.length-1)]; }
   const [a,b] = WEATHER[type].t;
   const temp = clamp(f.temp + rint(-2,2), a-2, b+2) + L.bias;
-  S.cash -= L.rent;
+  addCash(-L.rent);
   const tf = clamp((temp - 10) / 24, 0.15, 1.1);
   sim = {
     min:0, speed:1, walkers:[], queue:[], spawnAcc:0, serveT:0, pitcher:0, weather:type, temp, tf,
@@ -84,7 +84,7 @@ function serve(w){
   const iceUsed = Math.min(S.recipe.i, S.ice); S.ice -= iceUsed;
   const t = taste(iceUsed);
   sim.cogs += sim.pcpc + iceUsed*S.cost.ice + S.cost.cups;
-  S.cash += S.recipe.price; sim.stats.revenue += S.recipe.price; sim.stats.sold++;
+  addCash(S.recipe.price); sim.stats.revenue += S.recipe.price; sim.stats.sold++;
   sim.popDelta += (t.score - 0.55) * 0.6;
   fb(t.key); say(w, t.key); saleFx(S.recipe.price);
   if (t.key === 'yum') w.hop = 0.6;
@@ -141,7 +141,6 @@ function endDay(){
   const waste = wPitcher + wIce + wLemons;
   const net = st.revenue - sim.cogs - waste - sim.rent;
   S.total += net;
-  if (!S.best || net > S.best.profit) S.best = { day:S.day, profit:net };
   const row = { day:S.day, weather:sim.weather, temp:sim.temp, loc:S.loc, seen:st.seen, sold:st.sold,
     sales:st.revenue, cogs:sim.cogs, wLemons, wIce, wPitcher, waste, rent:sim.rent, capex:S.capex || 0,
     bought:S.spend, net, cash:S.cash, stock:stockValue(), pop:S.pop, price:S.recipe.price };

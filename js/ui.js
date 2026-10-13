@@ -8,10 +8,9 @@ const isMobile = () => mobileMQ.matches;
 mobileMQ.addEventListener('change', () => renderBoard());
 
 function supplyRow(k){
-  const it = SHOP[k], fresh = S.lemons.filter(b => b.age === 3).reduce((a,b) => a+b.n, 0);
-  const have = k === 'lemons' ? lemonCount() : S[k];
-  const extra = k === 'lemons' && fresh ? ` <span class="warn">${fresh} go bad tonight.</span>` : '';
-  return `<div class="row"><div><h3>${it.icon} ${it.name}: ${have}</h3><p>${it.note}${extra}</p></div>
+  const it = SHOP[k], expiring = sum(S.lemons.filter(b => b.age === 3), b => b.n);
+  const extra = k === 'lemons' && expiring ? ` <span class="warn">${expiring} go bad tonight.</span>` : '';
+  return `<div class="row"><div><h3>${it.icon} ${it.name}: ${haveOf(k)}</h3><p>${it.note}${extra}</p></div>
     <div class="packs">${it.packs.map(([n,p],i) => `<button class="pack" data-act="buy:${k}:${i}" ${S.cash < p ? 'disabled' : ''}>Buy ${n}<small>${money(p)}</small></button>`).join('')}</div></div>`;
 }
 function upgradeRow(u){
@@ -75,7 +74,7 @@ function renderBoard(){
       + recStep('s','Sugar per pitcher','Cups of sugar. Balance it against the lemons.', r.s)
       + recStep('i','Ice per cup','Hotter days call for more ice.', r.i);
   } else if (tab === 'price') {
-    body = pricePanel() + recStep('price','Price per cup','Pricier spots and hotter days let you charge more.', money(S.recipe.price));
+    body = pricePanel() + recStep('price','Price per cup','Changes in 5¢ steps.', money(S.recipe.price));
   } else {
     body = renderBooks();
   }
@@ -103,6 +102,7 @@ function pricePanel(){
   </dl></div>`;
 }
 
+const svgWrap = (w, h, g) => `<svg viewBox="0 0 ${w} ${h}" font-size="13" fill="#B9C8BC" font-family="Nunito, system-ui, sans-serif" role="img">${g}</svg>`;
 function svgBars(vals, labels, fmt){
   const w = 600, h = 180, pl = 52, pr = 8, pt = 12, pb = 24, n = vals.length;
   const top = Math.max(0, ...vals), bot = Math.min(0, ...vals), range = (top - bot) || 1;
@@ -116,7 +116,7 @@ function svgBars(vals, labels, fmt){
     g += `<rect x="${x.toFixed(1)}" y="${y0.toFixed(1)}" width="${(bw*0.7).toFixed(1)}" height="${hh.toFixed(1)}" rx="2" fill="${v >= 0 ? '#9BE39A' : '#FFB4A8'}"><title>Day ${labels[i]}: ${fmt(v)}</title></rect>`;
     if (i % every === 0) g += `<text x="${(pl + i*bw + bw/2).toFixed(1)}" y="${h-6}" text-anchor="middle">${labels[i]}</text>`;
   });
-  return `<svg viewBox="0 0 ${w} ${h}" font-size="13" fill="#B9C8BC" font-family="Nunito, system-ui, sans-serif" role="img">${g}</svg>`;
+  return svgWrap(w, h, g);
 }
 function svgLine(vals, labels, fmt){
   const w = 600, h = 180, pl = 52, pr = 12, pt = 12, pb = 24, n = vals.length;
@@ -130,7 +130,7 @@ function svgLine(vals, labels, fmt){
     g += `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3.5" fill="#FFD93B"><title>Day ${labels[i]}: ${fmt(v)}</title></circle>`;
     if (i % every === 0) g += `<text x="${x(i).toFixed(1)}" y="${h-6}" text-anchor="middle">${labels[i]}</text>`;
   });
-  return `<svg viewBox="0 0 ${w} ${h}" font-size="13" fill="#B9C8BC" font-family="Nunito, system-ui, sans-serif" role="img">${g}</svg>`;
+  return svgWrap(w, h, g);
 }
 function svgScatter(pts){
   const w = 600, h = 180, pl = 40, pr = 12, pt = 12, pb = 26;
@@ -141,7 +141,7 @@ function svgScatter(pts){
   g += `<text x="${pl-6}" y="${y(y1)+4}" text-anchor="end">${y1}</text><text x="${pl-6}" y="${y(0)+4}" text-anchor="end">0</text>`;
   g += `<text x="${pl}" y="${h-6}">${Math.round(x0+1)}°C</text><text x="${w-pr}" y="${h-6}" text-anchor="end">${Math.round(x1-1)}°C</text>`;
   pts.forEach(p => { g += `<circle cx="${x(p.x).toFixed(1)}" cy="${y(p.y).toFixed(1)}" r="6" fill="${p.c}" fill-opacity=".85"><title>Day ${p.d}: ${p.y} cups at ${p.x}°C</title></circle>`; });
-  return `<svg viewBox="0 0 ${w} ${h}" font-size="13" fill="#B9C8BC" font-family="Nunito, system-ui, sans-serif" role="img">${g}</svg>`;
+  return svgWrap(w, h, g);
 }
 const WCOLOR = { hot:'#FFB347', sunny:'#FFD93B', cloudy:'#D5DEE3', rain:'#7FC4F0', storm:'#A99CF0' };
 
@@ -163,7 +163,7 @@ function renderBooks(){
     <div class="chart"><h4>Cash at close</h4>${svgLine(lg.map(r => r.cash), days, v => money(v))}</div>
     <div class="chart"><h4>Cups sold by temperature</h4>${svgScatter(lg.map(r => ({ x:r.temp, y:r.sold, d:r.day, c:WCOLOR[r.weather] })))}</div>
   </div>`;
-  const rows = lg.slice().reverse().map(r => `<tr><td>${r.day}</td><td>${WEATHER[r.weather].icon} ${r.temp}°</td><td>${(LOCS.find(l => l.id === r.loc) || LOCS[0]).name}</td>
+  const rows = lg.slice().reverse().map(r => `<tr><td>${r.day}</td><td>${WEATHER[r.weather].icon} ${r.temp}°</td><td>${locById(r.loc).name}</td>
     <td>${r.sold}</td><td>${money(r.price)}</td><td>${money(r.sales)}</td><td>−${money(r.cogs)}</td><td>${r.waste ? '−' + money(r.waste) : '–'}</td><td>${r.rent ? '−' + money(r.rent) : '–'}</td>
     <td class="${r.net >= 0 ? 'good' : 'badc'}">${money(r.net)}</td><td>${r.capex ? money(r.capex) : '–'}</td><td>${money(r.cash)}</td></tr>`).join('');
   return tiles + charts + `<div class="books-h"><h3>Daily ledger</h3><button class="pack" data-act="season">Season report</button></div>
@@ -207,14 +207,13 @@ function showSeason(){
     <p class="sub" style="font-size:14px">An upgrade counts as paid off once your total profit since buying it covers its cost.</p>` : '<p class="sub">No upgrades bought yet.</p>'}
     <button class="open" data-act="closemodal">Back to the stand</button>
     ${S.seasonDone && lg.length >= SEASON ? '<button class="ghost" data-act="newgame">Start a new season</button>' : ''}`;
-  $('#card').classList.add('wide');
-  showModal(html);
+  showModal(html, true);
 }
 
 function renderAll(){ renderStats(); renderSceneStats(); renderBoard(); }
 
-function showModal(html){ $('#card').innerHTML = html; $('#modal').classList.add('on'); const b = $('#card button'); if (b) b.focus(); }
-function hideModal(){ $('#modal').classList.remove('on'); $('#card').classList.remove('wide'); }
+function showModal(html, wide = false){ $('#card').classList.toggle('wide', wide); $('#card').innerHTML = html; $('#modal').classList.add('on'); const b = $('#card button'); if (b) b.focus(); }
+function hideModal(){ $('#modal').classList.remove('on'); }
 function showReport(){
   const r = report, w = WEATHER[r.weather];
   const gross = r.sales - r.cogs, mpc = r.sold ? gross / r.sold : 0, pct = r.sales ? gross / r.sales * 100 : 0;
@@ -260,7 +259,7 @@ function showHelp(){
       <li>Open the stand and watch the day play out. Speed it up with 2× or 4×.</li>
       <li>Happy customers raise your popularity, which brings more buyers and unlocks better locations.</li>
       <li>Lemons go bad after 4 days and ice melts overnight, so don't overbuy.</li>
-      <li>The Recipe tab shows your cost and margin per cup. The Books tab tracks your daily finances.</li>
+      <li>The Price tab shows your cost and margin per cup. The Books tab tracks your daily finances.</li>
     </ol>
     <p class="sub">Your game saves automatically in this browser.</p>
     <button class="open" data-act="closehelp">Let's squeeze</button>
@@ -269,16 +268,14 @@ function showHelp(){
 
 function showShop(){
   hideDrawer();
-  $('#card').classList.add('wide');
   showModal(`<h2>Shop</h2><p class="sub">One-time upgrades that make your stand run better.</p>
     <div class="chalk"><div class="rows">${UPG.map(upgradeRow).join('')}</div></div>
-    <button class="open" data-act="closemodal">Back to the stand</button>`);
+    <button class="open" data-act="closemodal">Back to the stand</button>`, true);
 }
 function showLocations(){
-  $('#card').classList.add('wide');
   showModal(`<h2>Location</h2><p class="sub">Move to busier spots as your popularity grows.</p>
     <div class="chalk"><div class="rows">${LOCS.map(locationRow).join('')}</div></div>
-    <button class="open" data-act="closemodal">Back to the stand</button>`);
+    <button class="open" data-act="closemodal">Back to the stand</button>`, true);
 }
 
 function showDrawer(){ $('#drawer').classList.add('on'); $('.scrim').classList.add('on'); }
@@ -296,7 +293,7 @@ document.addEventListener('click', e => {
   if (act === 'buy') {
     const [n, p] = SHOP[a].packs[+c]; if (S.cash < p) return;
     const have = haveOf(a); S.cost[a] = (have * S.cost[a] + p) / (have + n);
-    S.cash = +(S.cash - p).toFixed(2); S.spend += p;
+    addCash(-p); S.spend += p;
     if (a === 'lemons') { const last = S.lemons[S.lemons.length-1]; if (last && last.age === 0) last.n += n; else S.lemons.push({ n, age:0 }); }
     else S[a] += n;
     save(); renderAll(); return;
@@ -307,7 +304,7 @@ document.addEventListener('click', e => {
     else r[a] = clamp(r[a] + d, 0, a === 'i' ? 8 : 10);
     save(); renderAll(); return;
   }
-  if (act === 'upg') { const u = UPG.find(x => x.id === a); if (S.cash >= u.cost && !S.upg[a]) { S.cash -= u.cost; S.capex = (S.capex || 0) + u.cost; S.upg[a] = true; S.upgLog[a] = { cost:u.cost, day:S.day }; save(); renderAll(); showShop(); } return; }
+  if (act === 'upg') { const u = UPG.find(x => x.id === a); if (S.cash >= u.cost && !S.upg[a]) { addCash(-u.cost); S.capex = (S.capex || 0) + u.cost; S.upg[a] = true; S.upgLog[a] = { cost:u.cost, day:S.day }; save(); renderAll(); showShop(); } return; }
   if (act === 'loc') { S.loc = a; save(); renderAll(); hideModal(); return; }
   if (act === 'open') { openStand(); return; }
   if (act === 'speed') { setSpeed(+a); return; }
