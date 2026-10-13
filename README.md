@@ -16,7 +16,7 @@ js/sim.js               The trading day: customer decisions, queue, taste scorin
 js/ui.js                Stats bar, tabs, Books tab and charts, day and season reports, shop, location, button handling
 js/shell.js             Title screen, menu, settings, how to play, confirm dialogs, sound effects, icons, pausing
 js/main.js              Game loop, start-up, offline support registration
-assets/                 Title-screen art (logo, portrait and landscape backgrounds) as WebP
+assets/                 Title-screen art as WebP: logo, plus portrait, 5:4 and 16:9 backgrounds (sources in ../LI images)
 sw.js                   Service worker (offline play, network-first so updates show immediately)
 manifest.webmanifest    Home Screen app settings
 icons/                  App icons

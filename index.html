@@ -11,12 +11,15 @@
 <meta name="description" content="Run a lemonade stand: buy supplies, perfect your recipe, watch the weather and grow Lemonade Inc.">
 <title>Lemonade Inc.</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
 <link rel="preload" href="assets/title.webp" as="image" type="image/webp">
+<link rel="preload" href="assets/opening.webp" as="image" type="image/webp" media="(max-aspect-ratio:11/10)">
+<link rel="preload" href="assets/bg-mid.webp" as="image" type="image/webp" media="(min-aspect-ratio:11/10) and (max-aspect-ratio:3/2)">
+<link rel="preload" href="assets/bg-wide.webp" as="image" type="image/webp" media="(min-aspect-ratio:3/2)">
 <link rel="stylesheet" href="css/style.css">
 <script>
   // Apply saved theme/motion before first paint so there's no flash.
@@ -30,8 +33,10 @@
 
 <!-- Title screen -->
 <section class="title" id="title" aria-label="Lemonade Inc. title screen">
-  <img class="title-logo" src="assets/title.webp" width="900" height="378" alt="Lemonade Inc.">
-  <div class="title-actions" id="titleActions"></div>
+  <div class="title-col">
+    <img class="title-logo" src="assets/title.webp" width="1400" height="588" alt="Lemonade Inc.">
+    <div class="title-actions" id="titleActions"></div>
+  </div>
 </section>
 
 <div class="wrap" id="game" inert>

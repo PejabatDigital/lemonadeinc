@@ -273,25 +273,42 @@ body.is-paused .paused-badge{ display:grid; }
 }
 
 /* ---------- 7. Title screen ---------- */
-.title{ position:fixed; inset:0; z-index:25; display:flex; flex-direction:column; align-items:center; background:var(--sky-300) url(../assets/opening.webp) center 55%/cover no-repeat; color:var(--slate-900); overflow:hidden; transition:opacity .35s ease; }
+/* The art and the logo are separate layers on every screen: the background fills the screen
+   (portrait, 5:4 or 16:9 art, whichever crops least) and the logo + buttons sit on top. */
+.title{ position:fixed; inset:0; z-index:25; display:flex; background:var(--sky-300) url(../assets/opening.webp) center 55%/cover no-repeat; color:var(--slate-900); overflow:hidden; transition:opacity .35s ease; }
 .title[hidden]{ display:flex; opacity:0; visibility:hidden; pointer-events:none; transition:opacity .35s ease, visibility 0s linear .35s; }
 .title::after{ content:""; position:absolute; inset:auto 0 0 0; height:min(62%, 420px); background:linear-gradient(to bottom, rgba(221,241,248,0), rgba(221,241,248,.92) 52%, var(--sky-100)); pointer-events:none; }
-.title-logo{ position:relative; z-index:1; width:min(86vw, 440px); height:auto; margin-top:calc(7vh + env(safe-area-inset-top,0px)); filter:drop-shadow(0 6px 12px rgba(60,30,0,.25)); animation:logoIn .7s var(--ease) both; }
-.title-actions{ position:relative; z-index:1; margin-top:auto; width:min(100% - 32px, 380px); display:grid; gap:var(--s-3); padding-bottom:calc(var(--s-6) + env(safe-area-inset-bottom,0px)); animation:actionsIn .6s .15s var(--ease) both; }
-.title-actions .btn-row .btn{ padding:0 var(--s-3); }
+.title-col{ position:relative; z-index:1; flex:1; display:flex; flex-direction:column; align-items:center; min-height:0; }
+.title-logo{ width:min(86vw, 440px); height:auto; margin-top:calc(7vh + env(safe-area-inset-top,0px)); filter:drop-shadow(0 6px 12px rgba(60,30,0,.25)); animation:logoIn .7s var(--ease) both; }
+.title-actions{ margin-top:auto; width:min(100% - 32px, 380px); display:grid; gap:var(--s-3); padding-bottom:calc(var(--s-6) + env(safe-area-inset-bottom,0px)); animation:actionsIn .6s .15s var(--ease) both; }
+.title-actions .btn-row .btn{ padding:0 var(--s-3); white-space:nowrap; }
 .title-foot{ margin:var(--s-1) 0 0; text-align:center; font-size:13px; font-weight:700; color:var(--slate-600); }
 @keyframes logoIn{ from{ opacity:0; transform:translateY(-16px) scale(.94); } to{ opacity:1; transform:none; } }
 @keyframes actionsIn{ from{ opacity:0; transform:translateY(16px); } to{ opacity:1; transform:none; } }
-/* Wide screens: landscape art already has the logo painted in, so hide ours and float the actions in a card */
-@media (min-aspect-ratio:5/4) and (min-width:700px){
-  .title{ align-items:flex-start; background-image:url(../assets/wide.webp); background-position:left center; }
-  .title::after{ display:none; }
-  .title-logo{ display:none; }
-  .title-actions{ position:absolute; left:auto; right:max(4vw, 24px); bottom:max(5vh, 24px); width:380px; padding:var(--s-5); border-radius:var(--r-xl); background:rgba(255,255,255,.9); box-shadow:var(--shadow-overlay); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
+/* Landscape: the stand is on the right of the art, so the logo and a card of buttons take the left side.
+   5:4 art up to 3:2 (iPad, split view), 16:9 art beyond that (laptops, desktops, phones on their side). */
+@media (min-aspect-ratio:11/10){
+  .title{ background-image:url(../assets/bg-mid.webp); background-position:70% 60%; }
+  .title::after{ inset:0 auto 0 0; width:60%; height:auto; background:linear-gradient(to right, rgba(221,241,248,.5), rgba(221,241,248,0)); }
+  .title-col{ flex:0 1 auto; width:min(46vw, 76vh); justify-content:center; gap:clamp(12px, 4vh, 40px); padding:calc(var(--s-4) + env(safe-area-inset-top,0px)) 0 calc(var(--s-4) + env(safe-area-inset-bottom,0px)); margin-left:max(3vw, 16px, env(safe-area-inset-left,0px)); }
+  .title-logo{ width:100%; max-height:42vh; object-fit:contain; margin-top:0; }
+  .title-actions{ margin-top:0; width:min(100%, 400px); padding:var(--s-5); border-radius:var(--r-xl); background:rgba(255,255,255,.9); box-shadow:var(--shadow-overlay); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
 }
-@media (min-aspect-ratio:5/4) and (max-height:500px){
-  .title-actions{ left:auto; right:16px; bottom:16px; width:340px; padding:var(--s-4); gap:var(--s-2); }
+@media (min-aspect-ratio:3/2){
+  .title{ background-image:url(../assets/bg-wide.webp); background-position:right 60%; }
+}
+/* Big landscape screens: scale the button card up with the logo */
+@media (min-aspect-ratio:11/10) and (min-height:1000px){ .title-actions{ zoom:1.2; } }
+@media (min-aspect-ratio:11/10) and (min-height:1300px){ .title-actions{ zoom:1.45; } }
+/* Short landscape screens (phones on their side): tighter logo and buttons so it all fits */
+@media (min-aspect-ratio:11/10) and (max-height:560px){
+  .title-col{ width:min(50vw, 420px); gap:var(--s-3); }
+  .title-logo{ max-height:34vh; }
+  .title-actions{ width:min(100%, 340px); padding:var(--s-3); gap:var(--s-2); }
   .title-actions .btn--lg{ min-height:var(--h-md); font-size:20px; }
+}
+@media (min-aspect-ratio:11/10) and (max-height:420px){
+  .title-foot{ display:none; }
 }
 
 /* ---------- 8. Layout ---------- */
