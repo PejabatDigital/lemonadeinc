@@ -1,12 +1,12 @@
 /* Lemonade Inc. | main.js
-   Game loop and start-up. */
+   Game loop and start-up. The day only advances while no menu or popup is open. */
 'use strict';
 
 // ---------- loop ----------
 let last = performance.now(), liveT = 0;
 function frame(ts){
   const dt = Math.min(0.05, (ts - last) / 1000); last = ts;
-  if (sim) {
+  if (sim && !isPaused()) {
     stepSim(dt);
     if (sim) {
       const m = Math.floor(sim.min), h = 9 + Math.floor(m/60), mm = String(m % 60).padStart(2,'0');
@@ -19,10 +19,10 @@ function frame(ts){
 }
 
 S = load() || newState();
+applyPrefs();
 resize();
 renderAll();
-$('#verline').textContent = 'Version ' + VERSION;
-if (!S.seenHelp) showHelp();
+showTitle();
 requestAnimationFrame(frame);
 
 // Offline support (only when served over http/https, not when opened as a local file)

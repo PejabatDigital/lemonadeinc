@@ -16,52 +16,64 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
+<link rel="preload" href="assets/title.webp" as="image" type="image/webp">
 <link rel="stylesheet" href="css/style.css">
+<script>
+  // Apply saved theme/motion before first paint so there's no flash.
+  try { const o = JSON.parse(localStorage.getItem('lemonade-inc-settings-v1') || '{}');
+    if (o.theme === 'light' || o.theme === 'dark') document.documentElement.dataset.theme = o.theme;
+    if (o.motion === 'reduce') document.documentElement.classList.add('reduce-motion');
+    if (o.motion === 'full') document.documentElement.classList.add('motion-on'); } catch (e) {}
+</script>
 </head>
-<body>
-<div class="wrap">
+<body class="locked">
+
+<!-- Title screen -->
+<section class="title" id="title" aria-label="Lemonade Inc. title screen">
+  <img class="title-logo" src="assets/title.webp" width="900" height="378" alt="Lemonade Inc.">
+  <div class="title-actions" id="titleActions"></div>
+</section>
+
+<div class="wrap" id="game" inert>
   <header class="top">
     <h1 class="brand"><span>🍋</span> Lemonade Inc.</h1>
     <div class="stats" id="stats"></div>
-    <button class="menubtn" data-act="menu" aria-label="Menu">☰</button>
+    <button class="iconbtn" data-act="menu" aria-label="Menu" aria-controls="sheet" aria-expanded="false"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
   </header>
 
-  <div class="scene">
-    <canvas id="cv" width="960" height="440" aria-label="Your lemonade stand"></canvas>
-    <div class="scene-stats" id="sceneStats"></div>
-    <div class="hud" id="hud">
-      <div class="clock" id="clock">9:00 am</div>
-      <div class="speeds">
-        <button data-act="speed:1" aria-pressed="true">1×</button>
-        <button data-act="speed:2" aria-pressed="false">2×</button>
-        <button data-act="speed:4" aria-pressed="false">4×</button>
-        <button data-act="close">Close</button>
+  <div class="stage">
+    <div class="scene">
+      <canvas id="cv" width="960" height="440" aria-label="Your lemonade stand"></canvas>
+      <div class="scene-stats" id="sceneStats"></div>
+      <div class="hud" id="hud">
+        <div class="clock" id="clock">9:00 am</div>
+        <div class="speeds">
+          <button data-act="speed:1" aria-pressed="true">1×</button>
+          <button data-act="speed:2" aria-pressed="false">2×</button>
+          <button data-act="speed:4" aria-pressed="false">4×</button>
+          <button data-act="close">Close</button>
+        </div>
       </div>
+      <div class="paused-badge" aria-hidden="true"><span>Paused</span></div>
     </div>
-  </div>
 
-  <div class="open-bar" id="openBar"></div>
+    <div class="open-bar" id="openBar"></div>
+  </div>
 
   <section class="board"><div class="chalk" id="board"></div></section>
 </div>
 
-<div class="modal" id="modal" role="dialog" aria-modal="true"><div class="card" id="card"></div></div>
+<div class="modal" id="modal"><div class="card" id="card" role="dialog" aria-modal="true" tabindex="-1"></div></div>
 
 <div class="scrim" data-act="closemenu"></div>
-<aside class="drawer" id="drawer">
-  <button class="drawer-close" data-act="closemenu" aria-label="Close menu">✕</button>
-  <nav class="drawer-nav">
-    <button class="drawer-link" data-act="shop">Shop</button>
-    <button class="drawer-link" data-act="help">How to play</button>
-  </nav>
-  <p class="drawer-version" id="verline"></p>
-</aside>
+<aside class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Menu"></aside>
 
 <script src="js/config.js"></script>
 <script src="js/state.js"></script>
 <script src="js/render.js"></script>
 <script src="js/sim.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/shell.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

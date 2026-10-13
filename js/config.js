@@ -4,7 +4,7 @@
 
 const W = 960, H = 440, STAND_X = 480, QY = 392, DAY_MIN = 540, SEASON = 30;
 const SAVE_KEY = 'sunny-squeeze-save-v1';
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 
 const LOCS = [
   { id:'lane', name:'Maple Lane', rent:0, traffic:70, tol:0.75, need:0, bias:0, desc:'A quiet street. Free to set up.' },
@@ -21,9 +21,13 @@ const WEATHER = {
 };
 const WORDER = ['hot','sunny','cloudy','rain','storm'];
 const WWEIGHT = [0.15,0.35,0.25,0.17,0.08];
+// There's no sugar-cube emoji, so draw one: a small isometric white cube.
+const SUGAR_CUBE = `<svg class="ico" viewBox="0 0 32 32" aria-hidden="true"><g stroke="#8E9CA4" stroke-width="1.2" stroke-linejoin="round">
+  <path d="M16 4 28 10 16 16 4 10Z" fill="#FFFFFF"/><path d="M4 10 16 16 16 29 4 23Z" fill="#E4EAED"/><path d="M16 16 28 10 28 23 16 29Z" fill="#C7D1D6"/></g>
+  <g fill="#AEBBC2"><circle cx="9" cy="16" r=".9"/><circle cx="12" cy="21" r=".9"/><circle cx="21" cy="19" r=".9"/><circle cx="24" cy="15" r=".9"/><circle cx="14" cy="9" r=".9"/><circle cx="19" cy="11" r=".9"/></g></svg>`;
 const SHOP = {
   lemons: { name:'Lemons', icon:'🍋', note:'Go bad after 4 days.', packs:[[12,3.00],[40,8.80],[100,19.00]] },
-  sugar:  { name:'Sugar', icon:'🍬', note:'Measured in cups. Keeps forever.', packs:[[10,1.80],[35,5.60],[90,12.60]] },
+  sugar:  { name:'Sugar', icon:SUGAR_CUBE, note:'Measured in cups. Keeps forever.', packs:[[10,1.80],[35,5.60],[90,12.60]] },
   ice:    { name:'Ice cubes', icon:'🧊', note:'Melts overnight.', packs:[[50,1.00],[200,3.40],[500,7.50]] },
   cups:   { name:'Paper cups', icon:'🥤', note:'One per customer.', packs:[[50,1.50],[150,3.90],[400,9.00]] },
 };

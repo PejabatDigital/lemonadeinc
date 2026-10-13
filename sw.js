@@ -2,15 +2,16 @@
    Offline support. Network-first: when online you always get the latest version
    from Netlify; when offline the last copy you played is served from the cache.
    Bump CACHE when you add or rename files so old caches get cleared. */
-const CACHE = 'lemonade-inc-v1';
+const CACHE = 'lemonade-inc-v3';
 const ASSETS = [
   './', 'index.html', 'css/style.css',
-  'js/config.js', 'js/state.js', 'js/render.js', 'js/sim.js', 'js/ui.js', 'js/main.js',
+  'js/config.js', 'js/state.js', 'js/render.js', 'js/sim.js', 'js/ui.js', 'js/shell.js', 'js/main.js',
+  'assets/title.webp', 'assets/opening.webp', 'assets/wide.webp',
   'manifest.webmanifest', 'icons/icon.svg', 'icons/apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png',
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {
@@ -25,8 +26,10 @@ self.addEventListener('fetch', e => {
   const url = new URL(req.url);
   const cacheable = url.origin === location.origin || url.hostname.endsWith('fonts.googleapis.com') || url.hostname.endsWith('fonts.gstatic.com');
   if (!cacheable) return;
+  // cache:'no-cache' makes the browser check with the server every time, instead of reusing a copy it
+  // decided was still fresh (that left edited files stale until a hard reload).
   e.respondWith(
-    fetch(req)
+    fetch(req, { cache: 'no-cache' })
       .then(res => { if (res.ok || res.type === 'opaque') { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); } return res; })
       .catch(() => caches.match(req, { ignoreSearch: true }).then(hit => hit || (req.mode === 'navigate' ? caches.match('index.html') : Response.error())))
   );
