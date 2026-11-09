@@ -2,6 +2,11 @@
    The trading day: customers deciding, queueing, taste scoring, and the end-of-day books. */
 'use strict';
 
+// The sim never touches the page. It announces 'open', 'sale' and 'end', and ui.js and shell.js react.
+const simListeners = {};
+const onSim = (event, fn) => (simListeners[event] = simListeners[event] || []).push(fn);
+const emit = (event, ...args) => (simListeners[event] || []).forEach(fn => fn(...args));
+
 // ---------- day simulation ----------
 function openStand(){
   const L = loc();
@@ -16,9 +21,7 @@ function openStand(){
     rent:L.rent, soldOut:null, popDelta:0, cogs:0, pcpc:0,
     stats:{ seen:0, sold:0, revenue:0, fb:{} },
   };
-  $('#hud').classList.add('on');
-  setSpeed(1);
-  renderAll();
+  emit('open');
 }
 function fb(k){ sim.stats.fb[k] = (sim.stats.fb[k] || 0) + 1; }
 function say(w, k){
@@ -27,22 +30,19 @@ function say(w, k){
 }
 
 function spawnWalker(){
-  const dir = Math.random() < .5 ? 1 : -1, laneY = 318 + Math.random()*26;
-  sim.walkers.push({ x: dir > 0 ? -30 : W+30, y:laneY, laneY, dir, spd:0.8 + Math.random()*0.5,
-    body:pick(BODY), skin:pick(SKIN), hair:pick(HAIR), h:0.9 + Math.random()*0.22,
-    bw:0.85 + Math.random()*0.35, pants:pick(PANTS), acc:pick(ACC), hatC:pick(['#E8574A','#2F3E5A','#F0C23E','#FFFFFF','#2F8A3E']),
-    long:Math.random() < .4, umb:Math.random() < .75, umbC:pick(UMB), hop:0, shiver:0,
-    state:'walk', decided:false, arrived:false, bubble:null, bt:0, phase:Math.random()*6, cup:false });
+  const dir = rng() < .5 ? 1 : -1, laneY = 318 + rng()*26;
+  sim.walkers.push({ x: dir > 0 ? -30 : W+30, y:laneY, laneY, dir, spd:0.8 + rng()*0.5, hop:0, shiver:0,
+    state:'walk', decided:false, arrived:false, bubble:null, bt:0, phase:rng()*6, cup:false });
 }
 function decide(w){
   w.decided = true; sim.stats.seen++;
   const umbrella = S.upg.parasol && (sim.temp >= 30 || WEATHER[sim.weather].wet) ? 1.2 : 1;
   const interest = clamp(sim.tf * (0.55 + S.pop/200) * WEATHER[sim.weather].want * umbrella, 0.05, 0.95);
-  if (Math.random() > interest) return;
+  if (rng() > interest) return;
   if (sim.soldOut) { say(w,'soldout'); fb('soldout'); sim.popDelta -= 0.15; return; }
   const r = S.recipe.price / sim.maxPrice;
   const priceOk = r <= 0.5 ? 1 : clamp(1 - (r - 0.5)*1.6, 0, 1);
-  if (r > 1 || Math.random() > priceOk) { say(w,'pricey'); fb('pricey'); sim.popDelta -= 0.04; return; }
+  if (r > 1 || rng() > priceOk) { say(w,'pricey'); fb('pricey'); sim.popDelta -= 0.04; return; }
   if (sim.queue.length >= 6) { say(w,'line'); fb('line'); sim.popDelta -= 0.08; return; }
   w.state = 'queue'; sim.queue.push(w);
 }
@@ -64,7 +64,7 @@ function taste(iceUsed){
   const r = S.recipe.price / sim.maxPrice; terms.push(['pricey', r > 0.75 ? (r-0.75)*0.6 : 0]);
   let pen = 0, worst = terms[0];
   for (const t of terms) { pen += t[1]; if (t[1] > worst[1]) worst = t; }
-  const score = clamp(1 - pen + (Math.random() - 0.5)*0.12, 0, 1);
+  const score = clamp(1 - pen + (rng() - 0.5)*0.12, 0, 1);
   const key = score >= 0.78 ? 'yum' : (worst[1] >= 0.1 ? worst[0] : 'ok');
   return { score, key };
 }
@@ -82,7 +82,7 @@ function serve(w){
   sim.cogs += sim.pcpc + iceUsed*S.cost.ice + S.cost.cups;
   addCash(S.recipe.price); sim.stats.revenue += S.recipe.price; sim.stats.sold++;
   sim.popDelta += (t.score - 0.55) * 0.6;
-  fb(t.key); say(w, t.key); saleFx(S.recipe.price);
+  fb(t.key); say(w, t.key); emit('sale', S.recipe.price);
   if (t.key === 'yum') w.hop = 0.6;
   if (t.key === 'muchice') w.shiver = 1.4;
   w.state = 'leave'; w.cup = true;
@@ -147,11 +147,6 @@ function endDay(){
   S.day++; S.spend = 0; S.capex = 0; S.forecast = genForecast();
   if (S.day > SEASON && !S.seasonDone) { S.seasonDone = true; report.season = true; }
   sim = null;
-  $('#hud').classList.remove('on');
-  save(); renderAll(); showReport();
-}
-
-function setSpeed(n){
-  if (!sim) return; sim.speed = n;
-  document.querySelectorAll('[data-act^="speed:"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.act === 'speed:' + n)));
+  save();
+  emit('end');
 }

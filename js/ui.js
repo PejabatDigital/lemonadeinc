@@ -222,6 +222,14 @@ function showSeason(){
 
 function renderAll(){ renderStats(); renderSceneStats(); renderBoard(); }
 
+function setSpeed(n){
+  if (!sim) return; sim.speed = n;
+  document.querySelectorAll('[data-act^="speed:"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.act === 'speed:' + n)));
+}
+onSim('open', () => { $('#hud').classList.add('on'); setSpeed(1); renderAll(); });
+onSim('sale', saleFx);
+onSim('end', () => { $('#hud').classList.remove('on'); renderAll(); showReport(); });
+
 // Popups. opts: { wide, dismiss } where dismiss is what ✕ / Esc / tapping outside does:
 // a function, or false when the player has to pick one of the buttons (day report, confirm).
 let modalDismiss = null, modalReturn = null;
@@ -309,21 +317,9 @@ document.addEventListener('click', e => {
   if (act === 'sel') { supplyItem = a; renderBoard(); return; }
   if (act === 'showloc') { showLocations(); return; }
   if (act === 'shop') { showShop(); return; }
-  if (act === 'buy') {
-    const [n, p] = SHOP[a].packs[+c]; if (S.cash < p) return;
-    const have = haveOf(a); S.cost[a] = (have * S.cost[a] + p) / (have + n);
-    addCash(-p); S.spend += p;
-    if (a === 'lemons') { const last = S.lemons[S.lemons.length-1]; if (last && last.age === 0) last.n += n; else S.lemons.push({ n, age:0 }); }
-    else S[a] += n;
-    sfx('buy'); save(); renderAll(); return;
-  }
-  if (act === 'rec') {
-    const d = +c, r = S.recipe;
-    if (a === 'price') r.price = +clamp(r.price + d*0.05, 0.05, 5).toFixed(2);
-    else r[a] = clamp(r[a] + d, 0, a === 'i' ? 8 : 10);
-    save(); renderAll(); return;
-  }
-  if (act === 'upg') { const u = UPG.find(x => x.id === a); if (S.cash >= u.cost && !S.upg[a]) { addCash(-u.cost); S.capex += u.cost; S.upg[a] = true; S.upgLog[a] = { cost:u.cost, day:S.day }; sfx('upgrade'); save(); renderAll(); showShop(); } return; }
+  if (act === 'buy') { if (buyPack(a, +c)) { sfx('buy'); save(); renderAll(); } return; }
+  if (act === 'rec') { changeRecipe(a, +c); save(); renderAll(); return; }
+  if (act === 'upg') { if (buyUpgrade(a)) { sfx('upgrade'); save(); renderAll(); showShop(); } return; }
   if (act === 'loc') { S.loc = a; sfx('tap'); save(); renderAll(); hideModal(); return; }
   if (act === 'open') { openStand(); return; }
   if (act === 'speed') { setSpeed(+a); return; }

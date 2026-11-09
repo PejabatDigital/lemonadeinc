@@ -357,7 +357,14 @@ const HAIR = ['#2B1D14','#5A3A22','#C9A15A','#1E1E1E','#8C3B22','#B8B8B8'];
 const ACC = ['none','none','none','hat','cap','bag','glasses'];
 const UMB = ['#E8574A','#4C7FD1','#F0C23E','#2BA3A3','#8E5CC4'];
 
+// How a customer looks. Added the first time they're drawn, so the sim only deals with what they do.
+function walkerLook(){
+  return { body:pick(BODY), skin:pick(SKIN), hair:pick(HAIR), h:0.9 + Math.random()*0.22, bw:0.85 + Math.random()*0.35,
+    pants:pick(PANTS), acc:pick(ACC), hatC:pick(['#E8574A','#2F3E5A','#F0C23E','#FFFFFF','#2F8A3E']),
+    long:Math.random() < .4, umb:Math.random() < .75, umbC:pick(UMB) };
+}
 function drawWalker(w, t){
+  if (!w.body) Object.assign(w, walkerLook());
   const s = w.h, bw = w.bw, moving = w.state !== 'queue' || !w.arrived;
   let x = w.x, y = w.y;
   if (w.hop > 0) y -= Math.abs(Math.sin(w.hop * 11)) * 9;

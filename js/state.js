@@ -7,7 +7,7 @@ let S, sim = null, tab = 'supplies', report = null;
 let supplyItem = 'lemons';
 
 function genForecast(){
-  let r = Math.random(), i = 0;
+  let r = rng(), i = 0;
   while (i < WORDER.length - 1 && r > WEATHER[WORDER[i]].weight) { r -= WEATHER[WORDER[i]].weight; i++; }
   const type = WORDER[i], [a,b] = WEATHER[type].t, temp = rint(a,b);
   return { type, temp, actual:rollActual(type, temp) };
@@ -15,7 +15,7 @@ function genForecast(){
 // What the day really turns out like. Decided along with the forecast and saved, so reloading can't re-roll it.
 function rollActual(type, temp){
   let real = type;
-  if (Math.random() > 0.75) { const i = WORDER.indexOf(type); real = WORDER[clamp(i + (Math.random() < .5 ? -1 : 1), 0, WORDER.length-1)]; }
+  if (rng() > 0.75) { const i = WORDER.indexOf(type); real = WORDER[clamp(i + (rng() < .5 ? -1 : 1), 0, WORDER.length-1)]; }
   const [a,b] = WEATHER[real].t;
   return { type:real, temp:clamp(temp + rint(-2,2), a-2, b+2) };
 }
@@ -75,4 +75,27 @@ function useLemons(n){
   let left = n;
   for (const b of S.lemons) { const take = Math.min(b.n, left); b.n -= take; left -= take; if (!left) break; }
   S.lemons = S.lemons.filter(b => b.n > 0);
+}
+
+// ---------- player actions: each returns false if the game refuses it ----------
+function buyPack(k, i){
+  const [n, p] = SHOP[k].packs[i];
+  if (S.cash < p) return false;
+  const have = haveOf(k);
+  S.cost[k] = (have * S.cost[k] + p) / (have + n);
+  addCash(-p); S.spend += p;
+  if (k === 'lemons') { const last = S.lemons[S.lemons.length-1]; if (last && last.age === 0) last.n += n; else S.lemons.push({ n, age:0 }); }
+  else S[k] += n;
+  return true;
+}
+function buyUpgrade(id){
+  const u = UPG.find(x => x.id === id);
+  if (S.cash < u.cost || S.upg[id]) return false;
+  addCash(-u.cost); S.capex += u.cost; S.upg[id] = true; S.upgLog[id] = { cost:u.cost, day:S.day };
+  return true;
+}
+function changeRecipe(key, dir){
+  const r = S.recipe;
+  if (key === 'price') r.price = +clamp(r.price + dir*0.05, 0.05, 5).toFixed(2);
+  else r[key] = clamp(r[key] + dir, 0, key === 'i' ? 8 : 10);
 }

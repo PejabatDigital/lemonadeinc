@@ -61,10 +61,9 @@ function sfx(kind){
     tone(ctx, t, 1568, .05, 'square', .018); tone(ctx, t + .05, 2093, .12, 'square', .018);
   }
 }
-// Hook the game's own moments without touching the sim: a sale, opening, end of day.
-{ const f = saleFx; saleFx = function(p){ sfx('sale'); return f.apply(this, arguments); }; }
-{ const f = openStand; openStand = function(){ const r = f.apply(this, arguments); if (sim) sfx('open'); return r; }; }
-{ const f = showReport; showReport = function(){ sfx('day'); return f.apply(this, arguments); }; }
+onSim('sale', () => sfx('sale'));
+onSim('open', () => sfx('open'));
+onSim('end', () => sfx('day'));
 
 // ---------- overlay state: pause the trading day while a menu or popup is up ----------
 let titleOpen = false, menuOpen = false;
