@@ -1,9 +1,9 @@
 /* The trading day: opening, customers, serving, taste, end-of-day books. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DAY_MIN, SEASON, BALANCE, SHOP, UPG, TIPS, rint, rng, setRng } from '../js/config.js';
+import { DAY_MIN, SEASON, BALANCE, SHOP, UPG, TIPS, LOCS, CUSTOMERS, STAND_X, QY, rint, rng, setRng } from '../js/config.js';
 import { S, sim, report, setState, setSim, newState, normalize, lemonCount, buyPack, buyUpgrade, stockValue } from '../js/state.js';
-import { openStand, onSim, taste, decide, serve, stepSim, endDay } from '../js/sim.js';
+import { openStand, onSim, taste, decide, serve, stepSim, endDay, pickCustomer, priceLimit } from '../js/sim.js';
 import { loadGame, assertNear, stockUp, customer, playDay } from './load-game.js';
 
 test('opening charges rent and starts the day', () => {
@@ -73,8 +73,8 @@ test('taste feedback names what is wrong', () => {
     const got = loadGame().run(k => {
       setRng(() => 0.5);
       S.recipe.l = k.l; S.recipe.s = k.s; S.recipe.price = k.price || 0.4;
-      setSim({ temp: k.temp, maxPrice: 2 });
-      return taste(k.ice).key;
+      setSim({ temp: k.temp, willingness: 2 });
+      return taste(k.ice, 'family').key;
     }, c);
     assert.equal(got, c.want, JSON.stringify(c));
   }
@@ -83,28 +83,28 @@ test('taste feedback names what is wrong', () => {
 test('a small flaw on a bad roll is just pretty good', () => {
   const r = loadGame().run(() => {
     setRng(() => 0);
-    S.recipe.l = 4; S.recipe.s = 4; S.recipe.price = 1.8;
-    setSim({ temp: 28, maxPrice: 2 });
-    return taste(2).key;
+    S.recipe.l = 4; S.recipe.s = 4; S.recipe.price = 1.62; // 90% of what a family will pay
+    setSim({ temp: 28, willingness: 2 });
+    return taste(2, 'family').key;
   });
   assert.equal(r, 'ok');
 });
 
-test('foot traffic and price tolerance follow location, weather, popularity and the sign', () => {
+test('foot traffic and willingness to pay follow location, weather, popularity and the sign', () => {
   const day = (type, pop, sign) => loadGame().run((t, p, s) => {
     stockUp(); S.loc = 'lane'; S.pop = p; S.upg.sign = s;
     S.forecast.actual = { type: t, temp: 22 };
     openStand();
-    return { traffic: sim.N, maxPrice: sim.maxPrice };
+    return { traffic: sim.N, willingness: sim.willingness };
   }, type, pop, sign);
   const sunny = day('sunny', 30, false);
   assertNear(sunny.traffic, 70 * 1.2);
-  assertNear(sunny.maxPrice, 0.75 * (0.55 + 0.55 * 0.5) * (0.85 + 30 / 300));
+  assertNear(sunny.willingness, (0.55 + 0.55 * 0.5) * (0.85 + 30 / 300));
   assertNear(day('rain', 30, false).traffic, 70 * 0.45 * 1.2);
   assertNear(day('sunny', 30, true).traffic, 70 * 1.2 * 1.15);
   const unknown = day('sunny', 0, false);
   assertNear(unknown.traffic, 70);
-  assertNear(unknown.maxPrice, 0.75 * (0.55 + 0.55 * 0.5) * 0.85);
+  assertNear(unknown.willingness, (0.55 + 0.55 * 0.5) * 0.85);
 });
 
 test('interest depends on the weather, and the parasol only helps when hot or wet', () => {
@@ -129,13 +129,14 @@ test('good lemonade raises popularity and bad lemonade lowers it', () => {
   const afterSale = (l, s) => loadGame().run((lemons, sugar) => {
     stockUp(); S.recipe.l = lemons; S.recipe.s = sugar; S.recipe.i = 3; S.recipe.price = 0.1;
     openStand();
-    sim.temp = 28; sim.maxPrice = 2;
+    sim.temp = 28; sim.willingness = 2;
     setRng(() => 0.5);
-    serve(customer());
+    serve(customer('office'));
     return sim.popDelta;
   }, l, s);
-  assertNear(afterSale(4, 4), (1 - 0.55) * 0.6);
-  assertNear(afterSale(8, 2), (0.22 - 0.55) * 0.6);
+  const forgiven = 1 - 0.3 * 10 / 100; // a new game starts at 10% popularity
+  assertNear(afterSale(5, 4), (1 - 0.55) * 0.6);
+  assertNear(afterSale(8, 2), (1 - (5 * 0.11 + 0.06) * forgiven - 0.55) * 0.6);
 });
 
 function decideWith(setup) {
@@ -174,7 +175,7 @@ test('sold out customers are turned away and it hurts popularity', () => {
 });
 
 test('a price over the limit drives customers off', () => {
-  const r = decideWith('S.recipe.price = sim.maxPrice + 0.05;');
+  const r = decideWith('S.recipe.price = sim.willingness * 0.9 + 0.05;');
   assert.equal(r.queued, false);
   assert.deepEqual(r.fb, { pricey: 1 });
   assertNear(r.pop, -0.04);
@@ -431,4 +432,143 @@ test('opening the stand records the stock it opened with', () => {
     return opening;
   });
   assert.deepEqual(r, { lemons: 500, sugar: 500, ice: 3000, cups: 500 });
+});
+
+test('each location sends its own mix of customers', () => {
+  for (const L of LOCS) {
+    const seen = loadGame(11).run(id => {
+      S.loc = id;
+      const counts = {};
+      for (let i = 0; i < 20000; i++) { const t = pickCustomer(); counts[t] = (counts[t] || 0) + 1; }
+      return counts;
+    }, L.id);
+    assert.deepEqual(Object.keys(seen).sort(), Object.keys(L.mix).sort(), L.id);
+    for (const [type, pct] of Object.entries(L.mix)) assertNear(seen[type] / 200, pct, 1);
+  }
+});
+
+test('every mix adds up to 100 and only names real customers', () => {
+  for (const L of LOCS) {
+    assert.equal(Object.values(L.mix).reduce((a, b) => a + b, 0), 100, L.id);
+    for (const type of Object.keys(L.mix)) assert.ok(CUSTOMERS[type], type);
+  }
+});
+
+test('a customer type will pay the same wherever it is', () => {
+  const limit = (id, type) => loadGame().run((where, t) => {
+    stockUp(); S.loc = where; S.forecast.actual = { type: 'sunny', temp: 26 };
+    S.loc = where; openStand();
+    sim.temp = 26; sim.willingness = 1;
+    const out = priceLimit(t);
+    setSim(null);
+    return out;
+  }, id, type);
+  assertNear(limit('lane', 'office'), limit('downtown', 'office'));
+  assertNear(limit('lane', 'office'), 1.5);
+  assertNear(limit('downtown', 'student'), 0.7);
+});
+
+test('each customer type has its own favourite cup', () => {
+  const key = (type, l, s, ice = 3) => loadGame().run((t, lemons, sugar, i) => {
+    setRng(() => 0.5);
+    S.recipe.l = lemons; S.recipe.s = sugar; S.recipe.price = 0.1;
+    setSim({ temp: 28, willingness: 2 });
+    const out = taste(i, t);
+    setSim(null);
+    return out;
+  }, type, l, s, ice);
+  assertNear(key('student', 3, 5).score, 1);
+  assertNear(key('office', 5, 4).score, 1);
+  assertNear(key('tourist', 4, 5, 4).score, 1);
+  assertNear(key('jogger', 4, 3, 4).score, 1);
+  assert.equal(key('student', 5, 4).key, 'sour', 'the office favourite is too sour for a student');
+  assert.equal(key('office', 5, 4).key, 'yum');
+  assert.equal(key('tourist', 4, 5, 3).key, 'yum', 'one cube short is still fine');
+  assert.equal(key('jogger', 3, 5, 3).key, 'sweet', 'the student favourite is too sweet for a jogger');
+});
+
+test('popularity forgives taste complaints, up to 30 percent', () => {
+  const score = pop => loadGame().run(p => {
+    setRng(() => 0.5);
+    S.pop = p; S.recipe.l = 8; S.recipe.s = 2; S.recipe.price = 0.1;
+    setSim({ temp: 28, willingness: 2 });
+    const out = taste(3, 'office').score;
+    setSim(null);
+    return out;
+  }, pop);
+  const penalty = 5 * 0.11 + 0.06;
+  assertNear(score(0), 1 - penalty);
+  assertNear(score(50), 1 - penalty * 0.85);
+  assertNear(score(100), 1 - penalty * 0.7);
+});
+
+test('popularity does not forgive a high price', () => {
+  const score = pop => loadGame().run(p => {
+    setRng(() => 0.5);
+    S.pop = p; S.recipe.l = 5; S.recipe.s = 4; S.recipe.price = 3 * 0.9; // the office favourite at 90% of the limit
+    setSim({ temp: 28, willingness: 2 });
+    const out = taste(3, 'office').score;
+    setSim(null);
+    return out;
+  }, pop);
+  assertNear(score(0), score(100));
+  assertNear(score(0), 1 - 0.15 * 0.6);
+});
+
+function lineOf(types) {
+  stockUp(); openStand(); sim.N = 0;
+  const line = types.map((t, i) => { const w = customer(t); w.state = 'queue'; w.x = STAND_X - i * 30; w.y = QY; w.arrived = true; sim.walkers.push(w); sim.queue.push(w); return w; });
+  return line;
+}
+
+test('someone waiting too long leaves the line and it hurts popularity', () => {
+  const r = loadGame().run(() => {
+    const [front, office] = lineOf(['family', 'office']);
+    sim.serveT = -1000; // keep the customer at the counter there for the whole test
+    stepSim(14 / 9);
+    const before = { state: office.state, line: sim.queue.length };
+    stepSim(1 / 9);
+    return { before, state: office.state, line: sim.queue.length, front: front.state, fb: sim.stats.fb, left: sim.stats.byType.office.left, pop: sim.popDelta };
+  });
+  assert.deepEqual(r.before, { state: 'queue', line: 2 });
+  assert.equal(r.state, 'leave');
+  assert.equal(r.line, 1);
+  assert.equal(r.front, 'queue', 'the customer at the counter does not give up');
+  assert.deepEqual(r.fb, { line: 1 });
+  assert.equal(r.left, 1);
+  assertNear(r.pop, -BALANCE.popLoss.line);
+});
+
+test('patience only runs once they are standing in line, and students wait longest', () => {
+  const r = loadGame().run(() => {
+    const [, walking, student] = lineOf(['family', 'office', 'student']);
+    sim.serveT = -1000;
+    walking.x = STAND_X - 800; walking.arrived = false;
+    student.x = STAND_X - 60;
+    stepSim(4 / 9); stepSim(4 / 9); stepSim(4 / 9); stepSim(4 / 9);
+    return { walking: walking.waited, student: student.state };
+  });
+  assert.equal(r.walking, 0);
+  assert.equal(r.student, 'queue');
+});
+
+test('the day report counts what happened to each customer type', () => {
+  const r = loadGame().run(() => {
+    stockUp(); S.recipe.price = 0.1; openStand();
+    setRng(() => 0);
+    const buyer = customer('student');
+    decide(buyer); serve(sim.queue.shift());
+    const priced = customer('student'); S.recipe.price = 4; decide(priced); S.recipe.price = 0.1;
+    sim.queue = [customer('office'), customer('office')];
+    sim.stats.byType.office.wanted = 2;
+    sim.soldOut = 'cups';
+    const late = customer('tourist'); decide(late);
+    sim.soldOut = null;
+    endDay();
+    return report.byType;
+  });
+  assert.deepEqual(r.student, { wanted: 2, bought: 1, pricey: 1, left: 0, soldout: 0 });
+  assert.deepEqual(r.office, { wanted: 2, bought: 0, pricey: 0, left: 2, soldout: 0 }, 'still waiting at closing counts as left');
+  assert.deepEqual(r.tourist, { wanted: 1, bought: 0, pricey: 0, left: 0, soldout: 1 });
+  assert.deepEqual(r.jogger, { wanted: 0, bought: 0, pricey: 0, left: 0, soldout: 0 });
 });

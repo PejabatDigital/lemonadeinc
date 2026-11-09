@@ -409,26 +409,53 @@ const HAIR = ['#2B1D14','#5A3A22','#C9A15A','#1E1E1E','#8C3B22','#B8B8B8'];
 const ACC = ['none','none','none','hat','cap','bag','glasses'];
 const UMB = ['#E8574A','#4C7FD1','#F0C23E','#2BA3A3','#8E5CC4'];
 
+// How each type of customer dresses. Skin and hair stay random.
+const LOOKS = {
+  student: () => ({ h:0.76 + Math.random()*0.1, acc:'cap', pack:pick(['#E8574A','#4C7FD1','#F0C23E','#2BA3A3']) }),
+  family:  () => ({ acc:pick(['none','none','glasses']), kid:{ body:pick(BODY), skin:pick(SKIN), hair:pick(HAIR), pants:pick(PANTS) } }),
+  jogger:  () => ({ acc:'none', long:false, body:pick(['#2BA3A3','#E8574A','#F09A3E','#8E5CC4']), shorts:pick(['#2F3E5A','#3B3B3B']), band:pick(['#FFFFFF','#F0C23E','#E8574A']) }),
+  office:  () => ({ acc:pick(['none','glasses']), body:pick(['#F2F5F8','#DCE8F5']), pants:pick(['#2F3E5A','#3B3B3B']), tie:pick(['#C0392B','#2F3E5A','#2F8A3E']) }),
+  tourist: () => ({ acc:'hat', hatC:'#E9CF8E', body:pick(['#F09A3E','#D65A9A','#2BA3A3','#E0C341']), print:pick(['#FFFFFF','#FFE14D']), camera:true }),
+};
 // How a customer looks. Added the first time they're drawn, so the sim only deals with what they do.
-function walkerLook(){
+function walkerLook(type){
   return { body:pick(BODY), skin:pick(SKIN), hair:pick(HAIR), h:0.9 + Math.random()*0.22, bw:0.85 + Math.random()*0.35,
     pants:pick(PANTS), acc:pick(ACC), hatC:pick(['#E8574A','#2F3E5A','#F0C23E','#FFFFFF','#2F8A3E']),
-    long:Math.random() < .4, umb:Math.random() < .75, umbC:pick(UMB) };
+    long:Math.random() < .4, umb:Math.random() < .75, umbC:pick(UMB), ...LOOKS[type]() };
+}
+// A family's child walks just behind the adult.
+function drawKid(w, x, y, sw){
+  const k = w.kid, s = 0.58, kx = x - w.dir*19, swing = sw * 0.7;
+  shadowAt(kx, w.y + 1, 7, 2.5, .2);
+  ctx.strokeStyle = k.pants; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(kx-1, y-18*s); ctx.lineTo(kx-1 + swing, y-1); ctx.moveTo(kx+1, y-18*s); ctx.lineTo(kx+1 - swing, y-1); ctx.stroke();
+  ctx.fillStyle = k.body; rr(kx - 6, y-45*s, 12, 29*s, 4); ctx.fill();
+  const hy = y - 54*s;
+  circ(kx, hy, 7, k.skin);
+  ctx.fillStyle = k.hair; ctx.beginPath(); ctx.arc(kx, hy - 1, 7.4, Math.PI*1.02, Math.PI*1.98); ctx.fill();
 }
 function drawWalker(w, t){
-  if (!w.body) Object.assign(w, walkerLook());
+  if (!w.body) Object.assign(w, walkerLook(w.type));
   const s = w.h, bw = w.bw, moving = w.state !== 'queue' || !w.arrived;
   let x = w.x, y = w.y;
   if (w.hop > 0) y -= Math.abs(Math.sin(w.hop * 11)) * 9;
   if (w.shiver > 0) x += Math.sin(t / 22) * 1.6;
   shadowAt(x, w.y + 1, 12*s*bw, 3.5, .22);
-  const sw = moving ? Math.sin(w.phase) * 6 * s : 0;
-  ctx.strokeStyle = w.pants; ctx.lineWidth = 5*s; ctx.lineCap = 'round';
+  const sw = moving ? Math.sin(w.phase) * (w.shorts ? 9 : 6) * s : 0;
+  if (w.kid) drawKid(w, x, y, sw);
+  ctx.strokeStyle = w.shorts ? w.skin : w.pants; ctx.lineWidth = (w.shorts ? 4 : 5)*s; ctx.lineCap = 'round';
   ctx.beginPath(); ctx.moveTo(x-2*s, y-18*s); ctx.lineTo(x-2*s + sw, y-1); ctx.moveTo(x+2*s, y-18*s); ctx.lineTo(x+2*s - sw, y-1); ctx.stroke();
   ctx.fillStyle = '#2D3A44'; ctx.fillRect(x-4*s + sw - 1, y-3, 6*s, 3); ctx.fillRect(x - sw - 1, y-3, 6*s, 3);
+  if (w.shorts) { ctx.fillStyle = w.shorts; rr(x - 7*s, y-20*s, 14*s, 10*s, 2); ctx.fill(); }
+  if (w.pack) { ctx.fillStyle = w.pack; rr(x - w.dir*(10*bw + 7)*s - 5*s, y-44*s, 11*s, 24*s, 4*s); ctx.fill(); }
   const bx = x - 10*s*bw, bwid = 20*s*bw;
   ctx.fillStyle = w.body; rr(bx, y-45*s, bwid, 29*s, 7*s); ctx.fill();
   ctx.fillStyle = shade(w.body, -0.18); ctx.fillRect(bx + bwid*0.68, y-43*s, bwid*0.25, 26*s);
+  if (w.tie) { ctx.fillStyle = w.tie; ctx.beginPath(); ctx.moveTo(x + w.dir*3*s - 2*s, y-45*s); ctx.lineTo(x + w.dir*3*s + 2*s, y-45*s); ctx.lineTo(x + w.dir*3*s + 2.5*s, y-26*s); ctx.lineTo(x + w.dir*3*s, y-22*s); ctx.lineTo(x + w.dir*3*s - 2.5*s, y-26*s); ctx.fill();
+    ctx.fillStyle = '#4A3424'; rr(x - w.dir*(10*bw + 7)*s - 8*s, y-24*s, 16*s, 12*s, 2); ctx.fill(); ctx.strokeStyle = '#4A3424'; ctx.lineWidth = 1.5; ctx.strokeRect(x - w.dir*(10*bw + 7)*s - 3*s, y-27*s, 6*s, 3*s); }
+  if (w.print) for (const [px, py] of [[-5,-40],[3,-36],[-3,-29],[5,-26],[-6,-22]]) circ(x + px*s*bw, y + py*s, 1.6*s, w.print);
+  if (w.pack) { ctx.strokeStyle = shade(w.pack, -0.2); ctx.lineWidth = 2*s; ctx.beginPath(); ctx.moveTo(x - w.dir*6*s, y-44*s); ctx.lineTo(x - w.dir*6*s, y-24*s); ctx.stroke(); }
+  if (w.camera) { ctx.fillStyle = '#2D3A44'; rr(x + w.dir*2*s - 5*s, y-38*s, 11*s, 8*s, 2); ctx.fill(); circ(x + w.dir*2*s + 0.5*s, y-34*s, 2.4*s, '#9FD3EA'); }
   ctx.strokeStyle = w.skin; ctx.lineWidth = 4*s;
   const arm = moving ? -Math.sin(w.phase) * 5 * s : 0;
   ctx.beginPath(); ctx.moveTo(x + w.dir*8*s*bw, y-40*s); ctx.lineTo(x + w.dir*(10*s*bw) + (w.cup ? w.dir*2 : arm), y-(w.cup ? 32 : 24)*s); ctx.stroke();
@@ -445,6 +472,7 @@ function drawWalker(w, t){
     ctx.fillStyle = w.hair; ctx.beginPath(); ctx.arc(x, hy - 2*s, 9.5*s, Math.PI*1.02, Math.PI*1.98); ctx.fill();
     if (w.long) ctx.fillRect(w.dir > 0 ? x - 9.5*s : x + 5.5*s, hy - 3*s, 4*s, 13*s);
   }
+  if (w.band) { ctx.fillStyle = w.band; ctx.fillRect(x - 9.5*s, hy - 6*s, 19*s, 3.5*s); }
   if (w.cup) {
     const cx = x + w.dir*(12*s*bw);
     ctx.fillStyle = '#FFFFFF'; ctx.fillRect(cx - 4, y-38*s, 8, 11); ctx.fillStyle = '#FFE14D'; ctx.fillRect(cx - 4, y-38*s, 8, 4);

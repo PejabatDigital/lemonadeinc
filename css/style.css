@@ -288,6 +288,8 @@ dialog[open]::backdrop{ opacity:1; }
 .mini th, .mini td{ padding:5px 6px; border-bottom:1px solid var(--border-default); }
 .mini th{ color:var(--text-muted); }
 .mini th:first-child, .mini td:first-child{ text-align:left; }
+.mini--crowd th{ white-space:normal; vertical-align:bottom; line-height:1.15; }
+.mini--crowd th, .mini--crowd td{ padding-left:3px; padding-right:3px; }
 
 /* In-game menu: right panel on wide screens, bottom sheet on phones */
 .sheet{ position:fixed; inset:0 0 0 auto; margin:0; width:340px; max-width:88vw; height:auto; max-height:none; padding:var(--s-5) var(--s-4); padding-top:calc(var(--s-5) + env(safe-area-inset-top,0px)); transform:translateX(100%); transition:transform var(--dur) var(--ease), box-shadow var(--dur), overlay var(--dur) allow-discrete, display var(--dur) allow-discrete; z-index:20; overflow:auto; }
@@ -357,6 +359,7 @@ dialog[open]::backdrop{ opacity:1; }
   .stat{ padding:4px 9px; font-size:14px; flex:0 0 auto; }
   .stat .meter{ display:none; }
   .scene{ aspect-ratio:3/4; }
+  .mini--crowd{ font-size:13px; } .mini--crowd td:first-child{ white-space:normal; }
   .stock{ gap:6px; } .stock-item{ padding:6px var(--s-1); } .stock-count{ font-size:18px; } .stock-item small{ font-size:12px; }
   .tabs{ gap:5px; } .tabs button{ flex:1 1 auto; padding:0 8px; }
   .card{ padding:var(--s-4); }

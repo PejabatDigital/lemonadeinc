@@ -1,7 +1,7 @@
 /* Lemonade Inc. | ui.js
    Board and popups: stats bar, tabs, Books, charts, day report, season report, shop, location, button handling.
    Title screen, menu, how-to-play, settings screen and confirm dialogs live in shell.js. */
-import { SEASON, DAY_MIN, BALANCE, LOCS, WEATHER, SHOP, UPG, FB, $, money, icon } from './config.js';
+import { SEASON, DAY_MIN, BALANCE, LOCS, WEATHER, SHOP, UPG, CUSTOMERS, FB, $, money, icon } from './config.js';
 import { S, sim, report, sum, cents, loc, locById, haveOf, yieldCups, cupCost, cupsFrom, cupsReady, stockValue, seasonTotals, isStuck, save, buyPack, buyUpgrade, changeRecipe } from './state.js';
 import { onSim, openStand } from './sim.js';
 import { saleFx } from './render.js';
@@ -263,6 +263,13 @@ onSim('open', () => { $('#hud').classList.add('on'); setSpeed(1); renderAll(); }
 onSim('sale', saleFx);
 onSim('end', () => { $('#hud').classList.remove('on'); renderAll(); showReport(); });
 
+function crowdTable(byType){
+  const rows = Object.entries(byType).filter(([, c]) => c.wanted), soldOut = rows.some(([, c]) => c.soldout);
+  if (!rows.length) return '';
+  return `<h3>Who came</h3><div class="mini-wrap"><table class="mini mini--crowd"><thead><tr><th>Customers</th><th>Wanted a drink</th><th>Bought</th><th>Too pricey</th><th>Left the line</th>${soldOut ? '<th>Sold out</th>' : ''}</tr></thead><tbody>
+    ${rows.map(([k, c]) => `<tr><td>${CUSTOMERS[k].name}</td><td>${c.wanted}</td><td>${c.bought}</td><td>${c.pricey}</td><td>${c.left}</td>${soldOut ? `<td>${c.soldout}</td>` : ''}</tr>`).join('')}
+  </tbody></table></div>`;
+}
 function showReport(){ openReport(); countUp($('#netv')); }
 function openReport(){
   const r = report, w = WEATHER[r.weather];
@@ -285,6 +292,7 @@ function openReport(){
     </dl>
     ${r.bought > 0 ? `<p class="sub sub--tight">You spent ${money(r.bought)} on stock today. Unused stock is worth ${money(r.stock)} and carries over.</p>` : ''}
     ${r.capex > 0 ? `<p class="sub sub--tight">You invested ${money(r.capex)} in upgrades.</p>` : ''}
+    ${crowdTable(r.byType)}
     ${fbs ? `<ul class="fb">${fbs}</ul>` : '<p class="sub">Nobody stopped by today.</p>'}
     ${r.tip ? `<p class="callout">Tip: ${r.tip}</p>` : ''}
     ${r.notes.map(n => `<p class="sub sub--tight">${n}</p>`).join('')}`;

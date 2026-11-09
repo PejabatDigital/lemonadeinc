@@ -14,15 +14,26 @@ export const BALANCE = {
   price:{ step:0.05, min:0.05, max:5 },
   popLoss:{ soldout:0.15, pricey:0.04, line:0.08 },
   popDailyLimit:12,
+  popForgiveness:0.3,     // how much less taste complaints count at 100% popularity
 };
 export const SAVE_KEY = 'sunny-squeeze-save-v1';
 export const VERSION = '1.1.0';
 
+// Who walks past. A type is the same everywhere; a location only changes the mix (mix in LOCS, in percent).
+// budget scales what they'll pay. patience is the game minutes they'll wait in line before their turn.
+// likes is their ideal cup: lemons minus sugar, lemons plus sugar, and ice compared with the day's ideal.
+export const CUSTOMERS = {
+  student: { name:'Students', budget:0.7, patience:60, likes:{ sour:-2, strength:8, ice:0 } },
+  family:  { name:'Families', budget:0.9, patience:40, likes:{ sour:0, strength:7, ice:0 } },
+  jogger:  { name:'Joggers', budget:1.0, patience:20, pace:1.35, likes:{ sour:1, strength:7, ice:1 } },
+  office:  { name:'Office workers', budget:1.5, patience:15, likes:{ sour:1, strength:9, ice:0 } },
+  tourist: { name:'Tourists', budget:1.8, patience:45, likes:{ sour:-1, strength:9, ice:1 } },
+};
 export const LOCS = [
-  { id:'lane', name:'Maple Lane', rent:0, traffic:70, tol:0.75, need:0, bias:0, icon:'🏡', desc:'A quiet street. Free to set up.' },
-  { id:'park', name:'City Park', rent:12, traffic:120, tol:1.00, need:20, bias:0, icon:'🌳', desc:'Joggers and families on weekends.' },
-  { id:'downtown', name:'Downtown', rent:30, traffic:190, tol:1.30, need:40, bias:-1, icon:'🏙️', desc:'Busy office crowd with money to spend.' },
-  { id:'beach', name:'Beachfront', rent:45, traffic:170, tol:1.60, need:60, bias:3, icon:'🏖️', desc:'Hot, thirsty and happy to pay.' },
+  { id:'lane', name:'Maple Lane', rent:0, traffic:70, need:0, bias:0, icon:'🏡', desc:'A quiet street. Free to set up.', mix:{ student:50, family:40, jogger:10 } },
+  { id:'park', name:'City Park', rent:12, traffic:120, need:20, bias:0, icon:'🌳', desc:'Joggers and families on weekends.', mix:{ student:10, family:40, jogger:35, office:10, tourist:5 } },
+  { id:'downtown', name:'Downtown', rent:30, traffic:190, need:40, bias:-1, icon:'🏙️', desc:'Busy office crowd with money to spend.', mix:{ student:10, family:5, jogger:10, office:65, tourist:10 } },
+  { id:'beach', name:'Beachfront', rent:45, traffic:170, need:60, bias:3, icon:'🏖️', desc:'Hot, thirsty and happy to pay.', mix:{ student:5, family:15, jogger:5, tourist:75 } },
 ];
 export const WEATHER = {
   hot:    { icon:'☀️', label:'Heatwave', traffic:1.1, want:1.1, t:[32,37], weight:0.15, color:'#FFB347' },

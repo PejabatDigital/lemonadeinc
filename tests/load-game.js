@@ -4,7 +4,7 @@ import { S, sim, newState, setState, setSim, setReport } from '../js/state.js';
 import { openStand, stepSim } from '../js/sim.js';
 
 export function stockUp(){ S.cash = 1000; S.cups = 500; S.sugar = 500; S.ice = 3000; S.lemons = [{ n:500, age:0 }]; }
-export function customer(){ return { state:'walk', decided:false, x:STAND_X, y:QY, laneY:330, dir:1, spd:1, phase:0, bt:0, hop:0, shiver:0 }; }
+export function customer(type = 'family'){ return { type, state:'walk', decided:false, waited:0, x:STAND_X, y:QY, laneY:330, dir:1, spd:1, phase:0, bt:0, hop:0, shiver:0 }; }
 export function playDay(){
   openStand();
   if (!sim) return null;
