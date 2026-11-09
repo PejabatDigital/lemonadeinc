@@ -2,8 +2,57 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { WORDER, WEATHER } from '../js/config.js';
-import { S, setSim, newState, buyPack, buyUpgrade, changeRecipe, lemonCount, useLemons, cupsFrom, cupsReady, cupCost, unitCost, refCost, isStuck, addCash, idealIce, genForecast, normalize, seasonTotals } from '../js/state.js';
+import { S, setSim, newState, buyPack, buyUpgrade, changeRecipe, lemonCount, useLemons, cupsFrom, cupsReady, cupCost, unitCost, refCost, isStuck, addCash, idealIce, genForecast, normalize, seasonTotals, emptyOrder, orderTotal, orderLeft, buyOrder, cheaperPack } from '../js/state.js';
 import { loadGame, assertNear } from './load-game.js';
+
+test('an order adds up its packs and moves no money until it is bought', () => {
+  const r = loadGame().run(() => {
+    const o = emptyOrder();
+    o.lemons[1] = 1; o.lemons[0] = 1; o.ice[1] = 1;
+    return { total: orderTotal(o), left: orderLeft(o), cash: S.cash, lemons: lemonCount(), ice: S.ice, spend: S.spend };
+  });
+  assert.deepEqual(r, { total: 15.2, left: 4.8, cash: 20, lemons: 0, ice: 0, spend: 0 });
+});
+
+test('buying an order delivers every pack and charges the total', () => {
+  const r = loadGame().run(() => {
+    const o = emptyOrder();
+    o.lemons[0] = 3; o.sugar[0] = 2; o.cups[0] = 1;
+    return { ok: buyOrder(o), cash: S.cash, spend: S.spend, lemons: lemonCount(), sugar: S.sugar, cups: S.cups };
+  });
+  assertNear(r.spend, 14.1);
+  assert.deepEqual({ ...r, spend: 0 }, { ok: true, cash: 5.9, spend: 0, lemons: 36, sugar: 20, cups: 50 });
+});
+
+test('an order the player cannot afford buys nothing at all', () => {
+  const r = loadGame().run(() => {
+    const o = emptyOrder();
+    o.lemons[0] = 1; o.lemons[1] = 2;
+    return { ok: buyOrder(o), cash: S.cash, lemons: lemonCount() };
+  });
+  assert.deepEqual(r, { ok: false, cash: 20, lemons: 0 });
+});
+
+test('an empty order does nothing', () => {
+  const r = loadGame().run(() => ({ ok: buyOrder(emptyOrder()), cash: S.cash }));
+  assert.deepEqual(r, { ok: false, cash: 20 });
+});
+
+test('an order costs the books the same as buying the packs one by one', () => {
+  const asOrder = loadGame().run(() => { const o = emptyOrder(); o.lemons = [1, 1, 0]; buyOrder(o); return S.cost.lemons; });
+  const oneByOne = loadGame().run(() => { buyPack('lemons', 0); buyPack('lemons', 1); return S.cost.lemons; });
+  assertNear(asOrder, oneByOne);
+});
+
+test('a bulk hint appears only when one bigger pack gives as much for less', () => {
+  const hint = (k, counts) => loadGame().run((item, c) => cheaperPack(item, c), k, counts);
+  assert.deepEqual(hint('lemons', [3, 0, 0]), [40, 8.8]);
+  assert.deepEqual(hint('ice', [4, 0, 0]), [200, 3.4]);
+  assert.equal(hint('lemons', [1, 0, 0]), null, 'a single pack is the cheapest way to get that many');
+  assert.equal(hint('lemons', [2, 0, 0]), null, 'two 12-packs are still cheaper than a 40-pack');
+  assert.equal(hint('lemons', [1, 1, 0]), null, 'no single pack beats this');
+  assert.equal(hint('lemons', [0, 0, 0]), null);
+});
 
 test('buying stock averages the cost of everything you hold', () => {
   const r = loadGame().run(() => {

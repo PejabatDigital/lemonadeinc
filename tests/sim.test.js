@@ -6,6 +6,24 @@ import { S, sim, report, setState, setSim, newState, normalize, lemonCount, buyP
 import { openStand, onSim, taste, decide, serve, stepSim, endDay, pickCustomer, priceLimit } from '../js/sim.js';
 import { loadGame, assertNear, stockUp, customer, playDay } from './load-game.js';
 
+test('the day report shows what happened to the stock', () => {
+  const r = loadGame().run(() => {
+    S.cash = 50; S.cups = 5; S.sugar = 10; S.ice = 20;
+    S.lemons = [{ n:12, age:3 }, { n:10, age:0 }];
+    S.recipe.l = 4; S.recipe.s = 4; S.recipe.i = 3;
+    openStand();
+    serve(customer());
+    endDay();
+    return report.used;
+  });
+  assert.deepEqual(r, {
+    lemons: { opened: 22, used: 4, lost: 8, left: 10 },
+    sugar: { opened: 10, used: 4, lost: 0, left: 6 },
+    ice: { opened: 20, used: 3, lost: 17, left: 0 },
+    cups: { opened: 5, used: 1, lost: 0, left: 4 },
+  });
+});
+
 test('opening charges rent and starts the day', () => {
   const r = loadGame().run(() => {
     stockUp(); S.cash = 50; S.loc = 'park';

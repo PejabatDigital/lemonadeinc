@@ -219,6 +219,15 @@ body.is-paused .paused-badge{ display:grid; }
 .packs{ display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-end; }
 .pack{ background:var(--board-ink); color:var(--board-chalk); border:0; border-radius:var(--r-sm); min-height:48px; padding:6px 10px; font-weight:800; font-size:15px; line-height:1.15; text-align:center; min-width:88px; }
 .pack small{ display:block; font-weight:700; font-size:13px; opacity:.7; }
+.order{ background:rgba(var(--chalk-50-rgb),.05); border:2px solid var(--accent-fill); border-radius:var(--r-md); padding:var(--s-3) 14px 14px; margin-top:var(--s-3); }
+.order h3{ margin:0 0 var(--s-1); font-family:var(--font-display); font-size:19px; font-weight:800; line-height:1.15; }
+.order-line{ display:grid; grid-template-columns:minmax(0,1fr) auto var(--h-md); align-items:center; gap:var(--s-2); min-height:var(--h-md); font-variant-numeric:tabular-nums; }
+.order-line b{ font-weight:800; }
+.order-less{ width:var(--h-sm); height:var(--h-sm); justify-self:end; border-radius:50%; border:2px solid var(--board-ink-soft); background:transparent; color:var(--board-ink); font-size:20px; font-weight:800; line-height:1; }
+.order-total{ border-top:1px dashed rgba(var(--chalk-50-rgb),.3); margin-top:var(--s-1); font-family:var(--font-display); font-size:20px; font-weight:800; }
+.order-hint{ margin:var(--s-1) 0 0; color:var(--board-ink-soft); font-size:14px; font-weight:700; }
+.order-hint.warn{ color:var(--board-negative); }
+.order .btn-row{ margin-top:var(--s-3); }
 .chips{ display:flex; gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch; padding:8px 4px; margin:-4px 0 8px; }
 .chip{ flex:0 0 auto; background:none; border:0; padding:6px 10px; font-size:32px; line-height:1; opacity:.55; transition:opacity .15s ease, transform .15s ease, filter .15s ease; }
 .chip[aria-pressed="true"]{ opacity:1; transform:scale(1.12); filter:drop-shadow(0 0 7px rgba(255,217,59,.85)); }
@@ -288,8 +297,8 @@ dialog[open]::backdrop{ opacity:1; }
 .mini th, .mini td{ padding:5px 6px; border-bottom:1px solid var(--border-default); }
 .mini th{ color:var(--text-muted); }
 .mini th:first-child, .mini td:first-child{ text-align:left; }
-.mini--crowd th{ white-space:normal; vertical-align:bottom; line-height:1.15; }
-.mini--crowd th, .mini--crowd td{ padding-left:3px; padding-right:3px; }
+.mini--compact th{ white-space:normal; vertical-align:bottom; line-height:1.15; }
+.mini--compact th, .mini--compact td{ padding-left:3px; padding-right:3px; }
 
 /* In-game menu: right panel on wide screens, bottom sheet on phones */
 .sheet{ position:fixed; inset:0 0 0 auto; margin:0; width:340px; max-width:88vw; height:auto; max-height:none; padding:var(--s-5) var(--s-4); padding-top:calc(var(--s-5) + env(safe-area-inset-top,0px)); transform:translateX(100%); transition:transform var(--dur) var(--ease), box-shadow var(--dur), overlay var(--dur) allow-discrete, display var(--dur) allow-discrete; z-index:20; overflow:auto; }
@@ -359,7 +368,7 @@ dialog[open]::backdrop{ opacity:1; }
   .stat{ padding:4px 9px; font-size:14px; flex:0 0 auto; }
   .stat .meter{ display:none; }
   .scene{ aspect-ratio:3/4; }
-  .mini--crowd{ font-size:13px; } .mini--crowd td:first-child{ white-space:normal; }
+  .mini--compact{ font-size:13px; } .mini--compact td:first-child{ white-space:normal; }
   .stock{ gap:6px; } .stock-item{ padding:6px var(--s-1); } .stock-count{ font-size:18px; } .stock-item small{ font-size:12px; }
   .tabs{ gap:5px; } .tabs button{ flex:1 1 auto; padding:0 8px; }
   .card{ padding:var(--s-4); }

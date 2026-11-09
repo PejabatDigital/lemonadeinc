@@ -2,24 +2,38 @@
    Board and popups: stats bar, tabs, Books, charts, day report, season report, shop, location, button handling.
    Title screen, menu, how-to-play, settings screen and confirm dialogs live in shell.js. */
 import { SEASON, DAY_MIN, BALANCE, LOCS, WEATHER, SHOP, UPG, CUSTOMERS, FB, $, money, icon } from './config.js';
-import { S, sim, report, sum, cents, loc, locById, haveOf, yieldCups, cupCost, cupsFrom, cupsReady, stockValue, seasonTotals, isStuck, save, buyPack, buyUpgrade, changeRecipe } from './state.js';
+import { S, sim, report, sum, cents, loc, locById, haveOf, yieldCups, cupCost, cupsFrom, cupsReady, stockValue, seasonTotals, isStuck, save, emptyOrder, orderTotal, orderLeft, buyOrder, cheaperPack, buyUpgrade, changeRecipe } from './state.js';
 import { onSim, openStand } from './sim.js';
 import { saleFx } from './render.js';
 import { sfx, reducedMotion } from './settings.js';
 import { showModal, hideModal, popupHead, dismissModal } from './dialogs.js';
 
 // ---------- UI ----------
-let tab = 'supplies', supplyItem = 'lemons';
-export const resetTab = () => { tab = 'supplies'; };
+let tab = 'supplies', supplyItem = 'lemons', order = emptyOrder();
+export const resetTab = () => { tab = 'supplies'; order = emptyOrder(); };
 const mobileMQ = window.matchMedia('(max-width:560px)');
 const isMobile = () => mobileMQ.matches;
 mobileMQ.addEventListener('change', () => renderBoard());
 
 function supplyRow(k){
-  const it = SHOP[k], expiring = sum(S.lemons.filter(b => b.age === BALANCE.lemonLife - 1), b => b.n);
+  const it = SHOP[k], expiring = sum(S.lemons.filter(b => b.age === BALANCE.lemonLife - 1), b => b.n), free = orderLeft(order);
   const extra = k === 'lemons' && expiring ? ` <span class="warn">${expiring} go bad tonight.</span>` : '';
   return `<div class="row"><div><h3><span class="sup-ico">${it.icon}</span>${it.name}: ${haveOf(k)}</h3><p>${it.note}${extra}</p></div>
-    <div class="packs">${it.packs.map(([n,p],i) => `<button class="pack" data-act="buy:${k}:${i}" ${S.cash < p ? 'disabled' : ''}>Buy ${n}<small>${money(p)}</small></button>`).join('')}</div></div>`;
+    <div class="packs">${it.packs.map(([n,p],i) => `<button class="pack" data-act="add:${k}:${i}" ${free < p ? 'disabled' : ''}>Add ${n}<small>${money(p)}</small></button>`).join('')}</div></div>`;
+}
+function orderPanel(){
+  const total = orderTotal(order);
+  if (!total) return '';
+  const lines = Object.entries(order).flatMap(([k, counts]) => counts.flatMap((count, i) => {
+    if (!count) return [];
+    const it = SHOP[k], [n, p] = it.packs[i], label = `${n} ${it.units}${count > 1 ? ` ×${count}` : ''}`;
+    return [`<div class="order-line"><span><span aria-hidden="true">${it.icon}</span> ${label}</span><b>${money(p * count)}</b><button class="order-less" data-act="less:${k}:${i}" aria-label="Remove one pack of ${n} ${it.units}">−</button></div>`];
+  })).join('');
+  const hints = Object.keys(SHOP).map(k => { const better = cheaperPack(k, order[k]); return better ? `<p class="order-hint">${SHOP[k].name}: the ${better[0]}-pack is ${money(better[1])}.</p>` : ''; }).join('');
+  const short = S.cash < total;
+  return `<div class="order"><h3>Your order</h3>${lines}<div class="order-line order-total"><span>Total</span><b${short ? ' class="badc"' : ''}>${money(total)}</b></div>${hints}
+    ${short ? '<p class="warn order-hint">That’s more than your cash. Remove something.</p>' : ''}
+    <div class="btn-row"><button class="btn btn--primary" data-act="orderbuy" ${short ? 'disabled' : ''}>Buy order</button><button class="btn btn--secondary" data-act="ordercancel">Cancel</button></div></div>`;
 }
 function upgradeRow(u){
   const owned = S.upg[u.id];
@@ -130,13 +144,16 @@ function paintBoard(){
   else if (S.cash < L.rent) msg = `You need ${money(L.rent)} for rent here. Move somewhere cheaper.`;
   else if (!ready) msg = S.cups ? 'Not enough lemons or sugar for one pitcher.' : 'You have no cups. Buy some before opening.';
   else if (S.ice < S.recipe.i * Math.min(ready, 20)) msg += ' You are short on ice.';
+  const pending = orderTotal(order) > 0;
+  if (pending) msg = 'Buy or cancel your order before opening.';
   el.innerHTML = `<div class="tabs" role="tablist">${tabs.map(([k,n]) => `<button role="tab" aria-selected="${tab===k}" data-act="tab:${k}">${n}</button>`).join('')}</div>
     <p class="panel-desc">${TAB_INFO[tab]}</p>
     <div class="panel"><div class="rows">${body}</div></div>
+    ${tab === 'supplies' ? orderPanel() : ''}
     <div class="go"><p>${msg}</p></div>`;
   $('#openBar').innerHTML = `<button class="loc-badge" data-act="showloc" aria-label="Location: ${L.name}. Change location">${icon('pin')}${L.name}</button>
     ${stuck ? '<button class="btn btn--primary btn--lg" data-act="newgame">New season</button>'
-      : `<button class="btn btn--primary btn--lg" data-act="open" ${S.cash < L.rent ? 'disabled' : ''}>Open stand</button>`}`;
+      : `<button class="btn btn--primary btn--lg" data-act="open" ${S.cash < L.rent || pending ? 'disabled' : ''}>Open stand</button>`}`;
 }
 function pricePanel(){
   const c = cupCost(), r = S.recipe, m = r.price - c.total, pct = r.price ? m / r.price * 100 : 0, L = loc();
@@ -266,8 +283,15 @@ onSim('end', () => { $('#hud').classList.remove('on'); renderAll(); showReport()
 function crowdTable(byType){
   const rows = Object.entries(byType).filter(([, c]) => c.wanted), soldOut = rows.some(([, c]) => c.soldout);
   if (!rows.length) return '';
-  return `<h3>Who came</h3><div class="mini-wrap"><table class="mini mini--crowd"><thead><tr><th>Customers</th><th>Wanted a drink</th><th>Bought</th><th>Too pricey</th><th>Left the line</th>${soldOut ? '<th>Sold out</th>' : ''}</tr></thead><tbody>
+  return `<h3>Who came</h3><div class="mini-wrap"><table class="mini mini--compact"><thead><tr><th>Customers</th><th>Wanted a drink</th><th>Bought</th><th>Too pricey</th><th>Left the line</th>${soldOut ? '<th>Sold out</th>' : ''}</tr></thead><tbody>
     ${rows.map(([k, c]) => `<tr><td>${CUSTOMERS[k].name}</td><td>${c.wanted}</td><td>${c.bought}</td><td>${c.pricey}</td><td>${c.left}</td>${soldOut ? `<td>${c.soldout}</td>` : ''}</tr>`).join('')}
+  </tbody></table></div>`;
+}
+function stockTable(used){
+  const rows = Object.entries(used).filter(([, u]) => u.opened);
+  if (!rows.length) return '';
+  return `<h3>Stock used</h3><div class="mini-wrap"><table class="mini mini--compact"><thead><tr><th>Item</th><th>Opened with</th><th>Used</th><th>Lost</th><th>Left</th></tr></thead><tbody>
+    ${rows.map(([k, u]) => `<tr><td>${SHOP[k].name}</td><td>${u.opened}</td><td>${u.used}</td><td>${u.lost}</td><td>${u.left}</td></tr>`).join('')}
   </tbody></table></div>`;
 }
 function showReport(){ openReport(); countUp($('#netv')); }
@@ -293,6 +317,7 @@ function openReport(){
     ${r.bought > 0 ? `<p class="sub sub--tight">You spent ${money(r.bought)} on stock today. Unused stock is worth ${money(r.stock)} and carries over.</p>` : ''}
     ${r.capex > 0 ? `<p class="sub sub--tight">You invested ${money(r.capex)} in upgrades.</p>` : ''}
     ${crowdTable(r.byType)}
+    ${stockTable(r.used)}
     ${fbs ? `<ul class="fb">${fbs}</ul>` : '<p class="sub">Nobody stopped by today.</p>'}
     ${r.tip ? `<p class="callout">Tip: ${r.tip}</p>` : ''}
     ${r.notes.map(n => `<p class="sub sub--tight">${n}</p>`).join('')}`;
@@ -308,29 +333,6 @@ function countUp(el){
   const v = +el.dataset.v, t0 = performance.now();
   const step = now => { const p = Math.min(1, (now - t0) / 800), e = 1 - Math.pow(1 - p, 3); el.textContent = money(v * e); if (p < 1) requestAnimationFrame(step); };
   requestAnimationFrame(step);
-}
-// Spells out what a pack changes, so the player can judge it before the money goes.
-let buyAskedAt = 0;
-function askBuy(k, i){
-  const it = SHOP[k], [n, p] = it.packs[i], have = haveOf(k), each = p / n;
-  const saving = 1 - each / (it.packs[0][1] / it.packs[0][0]);
-  const before = cupsFrom(k), best = Math.max(0, ...S.ledger.map(r => r.sold));
-  buyAskedAt = performance.now();
-  showModal(`${popupHead(`Buy ${n} ${it.units}?`, `${money(p)}, ${cents(each)} each${saving > 0.005 ? ` (${Math.round(saving * 100)}% off the smallest pack)` : ''}`, false)}
-    <dl class="tally">
-      <dt>${it.name} in stock</dt><dd>${have} → ${have + n}</dd>
-      ${k !== 'cups' && before !== Infinity ? `<dt>Makes</dt><dd>${before} → ${cupsFrom(k, have + n)} cups</dd>` : ''}
-      <dt>Cash</dt><dd>${money(S.cash)} → ${money(S.cash - p)}</dd>
-      ${best ? `<dt>Your best day so far</dt><dd>${best} cups sold</dd>` : ''}
-    </dl>
-    <p class="sub sub--tight">${it.note}</p>
-    <div class="btn-stack"><button class="btn btn--primary btn--lg btn--block" data-act="buyyes:${k}:${i}">Confirm</button>
-    <button class="btn btn--secondary btn--lg btn--block" data-act="dismiss">Cancel</button></div>`);
-}
-function confirmBuy(k, i){
-  if (performance.now() - buyAskedAt < 300) return; // the second tap of a double-tap can land on Confirm
-  hideModal();
-  if (buyPack(k, +i)) { sfx('buy'); save(); renderAll(); }
 }
 function showShop(){
   showModal(`${popupHead('Shop', `One-time upgrades for your stand. You have ${money(S.cash)}.`)}
@@ -348,8 +350,10 @@ export const ACTIONS = {
   sel(item){ supplyItem = item; renderBoard(); },
   showloc: showLocations,
   shop: showShop,
-  buy(item, pack){ askBuy(item, +pack); },
-  buyyes: confirmBuy,
+  add(item, pack){ order[item][+pack]++; sfx('tap'); renderBoard(); },
+  less(item, pack){ order[item][+pack]--; renderBoard(); },
+  ordercancel(){ order = emptyOrder(); renderBoard(); },
+  orderbuy(){ if (buyOrder(order)) { order = emptyOrder(); sfx('buy'); save(); renderAll(); } },
   rec(key, dir){ changeRecipe(key, +dir); save(); renderAll(); },
   upg(id){ if (buyUpgrade(id)) { sfx('upgrade'); save(); renderAll(); showShop(); } },
   loc(id){ S.loc = id; sfx('tap'); save(); renderAll(); hideModal(); },

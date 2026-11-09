@@ -96,6 +96,22 @@ export function buyPack(k, i){
   else S[k] += n;
   return true;
 }
+// An order is how many of each pack the player has picked: { lemons:[2,1,0], ... }. No money moves until buyOrder.
+export const emptyOrder = () => Object.fromEntries(Object.keys(SHOP).map(k => [k, SHOP[k].packs.map(() => 0)]));
+export const orderTotal = o => Math.round(sum(Object.keys(o), k => o[k].reduce((a, c, i) => a + c * SHOP[k].packs[i][1], 0)) * 100) / 100;
+export const orderLeft = o => Math.round((S.cash - orderTotal(o)) * 100) / 100;
+export function buyOrder(o){
+  const total = orderTotal(o);
+  if (!total || S.cash < total) return false;
+  for (const k in o) o[k].forEach((count, i) => { for (let n = 0; n < count; n++) buyPack(k, i); });
+  return true;
+}
+// One bigger pack that gives at least as much for less than the packs picked, if there is one.
+export function cheaperPack(k, counts){
+  const packs = SHOP[k].packs;
+  const units = counts.reduce((a, c, i) => a + c * packs[i][0], 0), cost = counts.reduce((a, c, i) => a + c * packs[i][1], 0);
+  return packs.find(([n, p]) => units && n >= units && p < cost - 0.005) || null;
+}
 export function buyUpgrade(id){
   const u = UPG.find(x => x.id === id);
   if (S.cash < u.cost || S.upg[id]) return false;

@@ -138,6 +138,7 @@ export function stepSim(dt){
 
 export function endDay(){
   for (const q of sim.queue) tally(q).left++; // still waiting at closing time
+  const atClose = Object.fromEntries(Object.keys(SHOP).map(k => [k, haveOf(k)]));
   const st = sim.stats, change = clamp(sim.popDelta, -BALANCE.popDailyLimit, BALANCE.popDailyLimit);
   const before = S.pop; S.pop = clamp(Math.round(S.pop + change), 0, 100);
   const notes = [];
@@ -163,7 +164,8 @@ export function endDay(){
   S.ledger.push(row);
   const top = Object.entries(st.fb).filter(([k]) => k !== 'yum' && k !== 'ok').sort((a,b) => b[1]-a[1])[0];
   const tipKey = top && (top[0] === 'line' && S.upg.register ? 'lineOwned' : top[0]);
-  setReport(Object.assign({}, row, { popChange:S.pop - before, fb:st.fb, byType:st.byType, notes, locName:loc().name,
+  const used = Object.fromEntries(Object.keys(SHOP).map(k => [k, { opened:sim.opening[k], used:sim.opening[k] - atClose[k], lost:atClose[k] - haveOf(k), left:haveOf(k) }]));
+  setReport(Object.assign({}, row, { popChange:S.pop - before, fb:st.fb, byType:st.byType, used, notes, locName:loc().name,
     tip: top && top[1] >= 2 ? TIPS[tipKey] : null }));
   S.day++; S.spend = 0; S.capex = 0; S.forecast = genForecast();
   if (S.day > SEASON && !S.seasonDone) { S.seasonDone = true; report.season = true; }
