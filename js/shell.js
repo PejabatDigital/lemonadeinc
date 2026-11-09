@@ -66,11 +66,12 @@ onSim('open', () => sfx('open'));
 onSim('end', () => sfx('day'));
 
 // ---------- overlay state: pause the trading day while a menu or popup is up ----------
-let titleOpen = false, menuOpen = false;
-const isPaused = () => !!sim && (titleOpen || menuOpen || modalOpen());
+let titleOpen = false;
+const menuOpen = () => $('#sheet').open;
+const isPaused = () => !!sim && (titleOpen || menuOpen() || modalOpen());
 function onOverlayChange(){
   document.body.classList.toggle('is-paused', isPaused());
-  document.body.classList.toggle('locked', titleOpen || menuOpen || modalOpen());
+  document.body.classList.toggle('locked', titleOpen || menuOpen() || modalOpen());
 }
 const hasProgress = () => !!sim || S.day > 1 || S.ledger.length > 0 || S.spend > 0 || S.capex > 0;
 
@@ -116,25 +117,17 @@ function renderMenu(){
     </nav>`;
 }
 function showMenu(){
-  renderMenu(); menuOpen = true;
-  $('#sheet').classList.add('on'); $('.scrim').classList.add('on');
+  renderMenu();
+  $('#sheet').showModal();
   $('[data-act="menu"]').setAttribute('aria-expanded', 'true');
   onOverlayChange();
   const first = $('#sheet .menu-item:not(:disabled)'); if (first) first.focus({ preventScroll:true });
 }
-// instant = another screen is about to open, so don't hand focus back to the menu button
-function hideMenu(instant){
-  if (!menuOpen) return;
-  menuOpen = false;
-  $('#sheet').classList.remove('on'); $('.scrim').classList.remove('on');
-  $('[data-act="menu"]').setAttribute('aria-expanded', 'false');
-  if (!instant) $('[data-act="menu"]').focus({ preventScroll:true });
-  onOverlayChange();
-}
+function hideMenu(){ $('#sheet').close(); }
 
 // ---------- how to play: 4 cards ----------
 const HOWTO = [
-  ['🛒', 'Stock up each morning', 'Check the forecast, then buy lemons, sugar, ice and cups. Lemons go bad after ' + LEMON_LIFE + ' days and ice melts overnight, so don’t overbuy.'],
+  ['🛒', 'Stock up each morning', 'Check the forecast, then buy lemons, sugar, ice and cups. Lemons go bad after ' + BALANCE.lemonLife + ' days and ice melts overnight, so don’t overbuy.'],
   ['🍋', 'Mix your recipe and price', 'Balance lemons, sugar and ice. Customers tell you what they think in speech bubbles. The Price tab shows your cost and margin per cup.'],
   ['☀️', 'Open the stand', 'Watch the day play out from 9am to 6pm. Speed it up with 2× or 4×, or close early if you sell out.'],
   ['📈', 'Grow the business', 'Happy customers raise popularity, which brings more buyers and unlocks busier spots. Buy upgrades in the Shop and track it all in Books.'],
@@ -166,7 +159,7 @@ function showSettings(){
     <div class="set-row"><div><b id="lblMotion">Reduce motion</b><small>Fewer animations. Follows your device until you change it.</small></div>
       <button class="toggle" role="switch" aria-checked="${reducedMotion()}" aria-labelledby="lblMotion" data-act="set:motion"></button></div>
     ${hasProgress() ? `<div class="mt-2">${menuItem('reset', 'Start a new season', 'newgame', null, { danger:true })}</div>` : ''}
-    <p class="fine">Lemonade Inc. v${VERSION}</p>`);
+    <p class="fine">Lemonade Inc. v${VERSION}</p>`, { redraw:showSettings });
 }
 function setPref(key, val, btn){
   if (key === 'sound') { prefs.sound = !prefs.sound; btn.setAttribute('aria-checked', String(prefs.sound)); if (prefs.sound) sfx('tap'); }
@@ -179,60 +172,57 @@ function setPref(key, val, btn){
 let nsBack = null;
 function confirmNewSeason(){
   if (!hasProgress()) { startNewSeason(); return; }
-  // Remember where we came from so "Keep playing" goes back there.
-  const card = $('#card');
-  nsBack = !modalOpen() ? null
-    : card.querySelector('[data-act^="set:"]') ? showSettings
-    : (report && report.season && card.querySelector('[data-act="next"]')) ? openReport
-    : card.querySelector('.tally') && S.seasonDone ? showSeason : null;
+  nsBack = modalOpen() ? modalRedraw : null; // so "Keep playing" returns to the popup we came from
   const sub = S.seasonDone ? `Your season finished with ${money(seasonTotals().net)} profit.` : `You’re on day ${S.day} with ${money(S.cash)} in the till.`;
   showModal(`${popupHead('Start a new season?', sub, false)}
     <p class="callout callout--warn">This wipes your current season, upgrades and books. It can’t be undone.</p>
     <div class="btn-stack"><button class="btn btn--danger btn--lg btn--block" data-act="ns:yes">Yes, start over</button>
     <button class="btn btn--secondary btn--lg btn--block" data-act="ns:no">Keep playing</button></div>`, { dismiss:cancelNewSeason });
 }
-function cancelNewSeason(){ const back = nsBack; nsBack = null; hideModal(); if (back) back(); }
+function cancelNewSeason(){ const back = nsBack; nsBack = null; if (back) back(); else hideModal(); }
 function startNewSeason(){
   if (sim) { sim = null; $('#hud').classList.remove('on'); }
   S = newState(); S.seenHelp = true; report = null; tab = 'supplies';
-  save(); hideModal(); hideMenu(true); renderAll();
+  save(); hideModal(); hideMenu(); renderAll();
   if (titleOpen) hideTitle();
   sfx('upgrade');
 }
 
-// ---------- actions (called from the click handler in ui.js) ----------
-function shellAction(act, a, c, btn){
-  if (act === 't-play') { audio(); hideTitle(); if (!S.seenHelp) showHelp(); return true; }
-  if (act === 't-continue') { audio(); hideTitle(); return true; }
-  if (act === 't-show') { hideMenu(true); hideModal(); showTitle(); return true; }
-  if (act === 'how') { if (a === 'next') showHelp(howStep + 1); else if (a === 'prev') showHelp(howStep - 1); else finishHelp(); return true; }
-  if (act === 'settings') { showSettings(); return true; }
-  if (act === 'set') { setPref(a, c, btn); return true; }
-  if (act === 'ns') { if (a === 'yes') startNewSeason(); else cancelNewSeason(); return true; }
-  return false;
-}
+// ---------- button actions ----------
+Object.assign(ACTIONS, {
+  menu: showMenu,
+  closemenu: hideMenu,
+  help(){ showHelp(); },
+  settings: showSettings,
+  newgame: confirmNewSeason,
+  set: setPref,
+  't-play'(){ audio(); hideTitle(); if (!S.seenHelp) showHelp(); },
+  't-continue'(){ audio(); hideTitle(); },
+  't-show'(){ hideMenu(); hideModal(); showTitle(); },
+  how(dir){ if (dir === 'next') showHelp(howStep + 1); else if (dir === 'prev') showHelp(howStep - 1); else finishHelp(); },
+  ns(answer){ if (answer === 'yes') startNewSeason(); else cancelNewSeason(); },
+});
 
-// ---------- keyboard, backdrop, focus trap ----------
-$('#modal').addEventListener('click', e => { if (e.target === e.currentTarget && modalDismiss) modalDismiss(); });
+// ---------- dialogs: tapping outside, closing, keyboard ----------
+function tappedOutside(e){
+  const d = e.currentTarget, r = d.getBoundingClientRect();
+  return e.target === d && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom);
+}
+$('#card').addEventListener('click', e => { if (tappedOutside(e) && modalDismiss) modalDismiss(); });
+$('#sheet').addEventListener('click', e => { if (tappedOutside(e)) hideMenu(); });
+$('#card').addEventListener('close', onOverlayChange);
+$('#sheet').addEventListener('close', () => { $('[data-act="menu"]').setAttribute('aria-expanded', 'false'); onOverlayChange(); });
+// A popup decides for itself whether it can be dismissed (phone back gestures arrive here).
+$('#card').addEventListener('cancel', e => { e.preventDefault(); if (modalDismiss) modalDismiss(); });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') {
-    if (modalOpen()) { if (modalDismiss) { e.preventDefault(); modalDismiss(); } }
-    else if (menuOpen) { e.preventDefault(); hideMenu(); }
+  if (e.key === 'Escape' && modalOpen()) { // handled here too: browsers stop honouring preventDefault on a repeated cancel
+    e.preventDefault();
+    if (modalDismiss) modalDismiss();
     return;
   }
   if (modalOpen() && $('#card .howto') && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
     const n = howStep + (e.key === 'ArrowRight' ? 1 : -1);
     if (n >= 0 && n < HOWTO.length) { e.preventDefault(); showHelp(n); }
-    return;
-  }
-  if (e.key === 'Tab') {
-    const root = modalOpen() ? $('#card') : menuOpen ? $('#sheet') : titleOpen ? $('#title') : null;
-    if (!root) return;
-    const f = [...root.querySelectorAll('button:not(:disabled), [href], input, select, [tabindex]:not([tabindex="-1"])')];
-    if (!f.length) return;
-    const first = f[0], last = f[f.length - 1], at = document.activeElement;
-    if (e.shiftKey && (at === first || at === root || !root.contains(at))) { e.preventDefault(); last.focus(); }
-    else if (!e.shiftKey && (at === last || !root.contains(at))) { e.preventDefault(); first.focus(); }
   }
 });
 // Swipe between how-to-play cards on touch screens.

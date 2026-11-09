@@ -3,7 +3,19 @@
 'use strict';
 
 const W = 960, H = 440, STAND_X = 480, QY = 392, DAY_MIN = 540, SEASON = 30;
-const LEMON_LIFE = 4; // days before a batch of lemons goes bad
+// Tuning numbers. The upgrade descriptions in UPG quote some of these, so update that text if you change them.
+const BALANCE = {
+  startCash:20, startPop:10,
+  lemonLife:4,            // days before a batch of lemons goes bad
+  pitcherCups:12, pressPitcherCups:15,
+  maxQueue:6, serveMinutes:8, registerServeMinutes:4,
+  signTraffic:1.15, parasolInterest:1.2,
+  forecastMiss:0.25,      // chance the day turns out different from the forecast
+  recipeMax:{ l:10, s:10, i:8 },
+  price:{ step:0.05, min:0.05, max:5 },
+  popLoss:{ soldout:0.15, pricey:0.04, line:0.08 },
+  popDailyLimit:12,
+};
 const SAVE_KEY = 'sunny-squeeze-save-v1';
 const VERSION = '1.1.0';
 
@@ -26,7 +38,7 @@ const SUGAR_CUBE = `<svg class="ico" viewBox="0 0 32 32" aria-hidden="true"><g s
   <path d="M16 4 28 10 16 16 4 10Z" fill="#FFFFFF"/><path d="M4 10 16 16 16 29 4 23Z" fill="#E4EAED"/><path d="M16 16 28 10 28 23 16 29Z" fill="#C7D1D6"/></g>
   <g fill="#AEBBC2"><circle cx="9" cy="16" r=".9"/><circle cx="12" cy="21" r=".9"/><circle cx="21" cy="19" r=".9"/><circle cx="24" cy="15" r=".9"/><circle cx="14" cy="9" r=".9"/><circle cx="19" cy="11" r=".9"/></g></svg>`;
 const SHOP = {
-  lemons: { name:'Lemons', icon:'🍋', note:`Go bad after ${LEMON_LIFE} days.`, packs:[[12,3.00],[40,8.80],[100,19.00]] },
+  lemons: { name:'Lemons', icon:'🍋', note:`Go bad after ${BALANCE.lemonLife} days.`, packs:[[12,3.00],[40,8.80],[100,19.00]] },
   sugar:  { name:'Sugar', icon:SUGAR_CUBE, note:'Measured in cups. Keeps forever.', packs:[[10,1.80],[35,5.60],[90,12.60]] },
   ice:    { name:'Ice cubes', icon:'🧊', note:'Melts overnight.', packs:[[50,1.00],[200,3.40],[500,7.50]] },
   cups:   { name:'Paper cups', icon:'🥤', note:'One per customer.', packs:[[50,1.50],[150,3.90],[400,9.00]] },

@@ -15,12 +15,12 @@ function genForecast(){
 // What the day really turns out like. Decided along with the forecast and saved, so reloading can't re-roll it.
 function rollActual(type, temp){
   let real = type;
-  if (rng() > 0.75) { const i = WORDER.indexOf(type); real = WORDER[clamp(i + (rng() < .5 ? -1 : 1), 0, WORDER.length-1)]; }
+  if (rng() < BALANCE.forecastMiss) { const i = WORDER.indexOf(type); real = WORDER[clamp(i + (rng() < .5 ? -1 : 1), 0, WORDER.length-1)]; }
   const [a,b] = WEATHER[real].t;
   return { type:real, temp:clamp(temp + rint(-2,2), a-2, b+2) };
 }
 function newState(){
-  return { v:1, day:1, cash:20, pop:10, lemons:[], sugar:0, ice:0, cups:0,
+  return { v:1, day:1, cash:BALANCE.startCash, pop:BALANCE.startPop, lemons:[], sugar:0, ice:0, cups:0,
     recipe:{ l:4, s:4, i:3, price:0.40 }, loc:'lane', upg:{}, forecast:genForecast(),
     spend:0, seasonDone:false, seenHelp:false,
     cost:Object.fromEntries(Object.keys(SHOP).map(k => [k, refCost(k)])), ledger:[], upgLog:{}, capex:0 };
@@ -34,7 +34,7 @@ function load(){
 const lemonCount = () => S.lemons.reduce((a,b) => a + b.n, 0);
 const locById = id => LOCS.find(l => l.id === id) || LOCS[0];
 const loc = () => locById(S.loc);
-const yieldCups = () => S.upg.juicer ? 15 : 12;
+const yieldCups = () => S.upg.juicer ? BALANCE.pressPitcherCups : BALANCE.pitcherCups;
 const idealIce = t => t >= 33 ? 5 : t >= 29 ? 4 : t >= 24 ? 3 : t >= 19 ? 2 : 1;
 const refCost = k => SHOP[k].packs[0][1] / SHOP[k].packs[0][0];
 const haveOf = k => k === 'lemons' ? lemonCount() : S[k];
@@ -96,6 +96,7 @@ function buyUpgrade(id){
 }
 function changeRecipe(key, dir){
   const r = S.recipe;
-  if (key === 'price') r.price = +clamp(r.price + dir*0.05, 0.05, 5).toFixed(2);
-  else r[key] = clamp(r[key] + dir, 0, key === 'i' ? 8 : 10);
+  const { step, min, max } = BALANCE.price;
+  if (key === 'price') r.price = +clamp(r.price + dir*step, min, max).toFixed(2);
+  else r[key] = clamp(r[key] + dir, 0, BALANCE.recipeMax[key]);
 }

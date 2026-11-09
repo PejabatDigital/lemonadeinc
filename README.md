@@ -57,7 +57,7 @@ Use the shared components instead of one-off styles: `.btn` (`--primary`, `--sec
 
 - **Saves** live in each browser's local storage for the site's domain, under the key `sunny-squeeze-save-v1` in `js/config.js`. Changing the key or the domain strands existing saves, which is why the key still has the game's old name.
 - **Offline cache:** if you add or rename files, add them to `ASSETS` in `sw.js` and bump the version in `CACHE`.
-- **Balancing:** prices, traffic, rent and upgrade costs are all in `js/config.js`. Taste and buying behaviour are in `js/sim.js` (`decide` and `taste`).
+- **Balancing:** prices, traffic, rent and upgrade costs are all in `js/config.js`, and `BALANCE` there holds the other tuning numbers. Taste and buying behaviour are in `js/sim.js` (`decide` and `taste`).
 - **Rules stay off the page:** `js/config.js`, `js/state.js` and `js/sim.js` must not touch the page, because the tests run them without a browser. The sim announces `open`, `sale` and `end` with `emit`, and `ui.js` and `shell.js` react with `onSim`. Anything random that affects the game uses `rng()`, not `Math.random`.
 - **Settings** (sound, theme, reduce motion) are saved separately under `lemonade-inc-settings-v1`, so starting a new season keeps them.
 - **Pausing:** the trading day stops while the menu, a popup or the title screen is open (`isPaused()` in `shell.js`).

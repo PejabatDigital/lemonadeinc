@@ -9,7 +9,7 @@ const isMobile = () => mobileMQ.matches;
 mobileMQ.addEventListener('change', () => renderBoard());
 
 function supplyRow(k){
-  const it = SHOP[k], expiring = sum(S.lemons.filter(b => b.age === LEMON_LIFE - 1), b => b.n);
+  const it = SHOP[k], expiring = sum(S.lemons.filter(b => b.age === BALANCE.lemonLife - 1), b => b.n);
   const extra = k === 'lemons' && expiring ? ` <span class="warn">${expiring} go bad tonight.</span>` : '';
   return `<div class="row"><div><h3><span class="sup-ico">${it.icon}</span>${it.name}: ${haveOf(k)}</h3><p>${it.note}${extra}</p></div>
     <div class="packs">${it.packs.map(([n,p],i) => `<button class="pack" data-act="buy:${k}:${i}" ${S.cash < p ? 'disabled' : ''}>Buy ${n}<small>${money(p)}</small></button>`).join('')}</div></div>`;
@@ -217,7 +217,7 @@ function showSeason(){
     <p class="sub sub--small">An upgrade counts as paid off once your total profit since buying it covers its cost.</p>` : '<p class="sub">No upgrades bought yet.</p>'}
     <div class="btn-stack"><button class="btn btn--primary btn--lg btn--block" data-act="dismiss">Back to the stand</button>
     ${S.seasonDone && lg.length >= SEASON ? '<button class="btn btn--secondary btn--block" data-act="newgame">Start a new season</button>' : ''}</div>`;
-  showModal(html, { wide:true });
+  showModal(html, { wide:true, redraw:showSeason });
 }
 
 function renderAll(){ renderStats(); renderSceneStats(); renderBoard(); }
@@ -230,36 +230,36 @@ onSim('open', () => { $('#hud').classList.add('on'); setSpeed(1); renderAll(); }
 onSim('sale', saleFx);
 onSim('end', () => { $('#hud').classList.remove('on'); renderAll(); showReport(); });
 
-// Popups. opts: { wide, dismiss } where dismiss is what ✕ / Esc / tapping outside does:
-// a function, or false when the player has to pick one of the buttons (day report, confirm).
-let modalDismiss = null, modalReturn = null;
+// Popups. opts: { wide, dismiss, redraw }. dismiss is what ✕ / Esc / tapping outside does: a function,
+// or false when the player has to pick one of the buttons (day report). redraw reopens this popup,
+// so a confirm shown on top of it can come back.
+let modalDismiss = null, modalRedraw = null, modalReturn = null;
 function popupHead(title, sub, close = true){
   return `<div class="popup-head"><div><h2 id="dlgTitle">${title}</h2>${sub ? `<p class="sub">${sub}</p>` : ''}</div>
     ${close ? `<button class="iconbtn" data-act="dismiss" aria-label="Close">${icon('close')}</button>` : ''}</div>`;
 }
 function showModal(html, opts = {}){
-  hideMenu(true);
-  const card = $('#card'), wasOpen = $('#modal').classList.contains('on');
-  if (!wasOpen) modalReturn = document.activeElement;
+  hideMenu();
+  const card = $('#card');
   modalDismiss = opts.dismiss === undefined ? () => { hideModal(); renderAll(); } : opts.dismiss;
+  modalRedraw = opts.redraw || null;
   card.classList.toggle('wide', !!opts.wide); card.innerHTML = html;
-  card.setAttribute('aria-labelledby', 'dlgTitle');
-  $('#modal').classList.add('on'); card.scrollTop = 0;
+  if (!card.open) { modalReturn = document.activeElement; card.showModal(); }
+  card.scrollTop = 0;
   card.focus({ preventScroll:true });
   onOverlayChange();
 }
 function hideModal(){
-  $('#modal').classList.remove('on'); modalDismiss = null;
-  if (modalReturn) {
-    // The button that opened the popup may have been redrawn while it was up; if so, find its replacement.
-    const act = modalReturn.dataset && modalReturn.dataset.act;
-    const el = document.contains(modalReturn) ? modalReturn : act ? $(`[data-act="${act}"]`) : null;
-    if (el && el.focus) el.focus({ preventScroll:true });
+  const opener = modalReturn;
+  modalDismiss = modalRedraw = modalReturn = null;
+  $('#card').close();
+  // close() refocuses the button that opened the popup, unless that button was redrawn while it was up.
+  if (opener && !document.contains(opener) && opener.dataset.act) {
+    const again = $(`[data-act="${opener.dataset.act}"]`);
+    if (again) again.focus({ preventScroll:true });
   }
-  modalReturn = null;
-  onOverlayChange();
 }
-const modalOpen = () => $('#modal').classList.contains('on');
+const modalOpen = () => $('#card').open;
 function showReport(){ openReport(); countUp($('#netv')); }
 function openReport(){
   const r = report, w = WEATHER[r.weather];
@@ -290,7 +290,7 @@ function openReport(){
       <div class="btn-stack"><button class="btn btn--primary btn--lg btn--block" data-act="season">See season report</button>
       <div class="btn-row"><button class="btn btn--secondary" data-act="next">Keep playing</button><button class="btn btn--secondary" data-act="newgame">New season</button></div></div>`;
   } else html += `<div class="btn-stack"><button class="btn btn--primary btn--lg btn--block" data-act="next">Start day ${S.day}</button></div>`;
-  showModal(html, { dismiss:false });
+  showModal(html, { dismiss:false, redraw:openReport });
 }
 function countUp(el){
   if (!el || reducedMotion()) return;
@@ -307,26 +307,25 @@ function showLocations(){
     <div class="list">${LOCS.map(locationRow).join('')}</div>`, { wide:true });
 }
 
+// What each data-act="name:a:c" button does. shell.js adds its own.
+const ACTIONS = {
+  tab(name){ tab = name; renderBoard(); },
+  dismiss(){ if (modalDismiss) modalDismiss(); },
+  sel(item){ supplyItem = item; renderBoard(); },
+  showloc: showLocations,
+  shop: showShop,
+  buy(item, pack){ if (buyPack(item, +pack)) { sfx('buy'); save(); renderAll(); } },
+  rec(key, dir){ changeRecipe(key, +dir); save(); renderAll(); },
+  upg(id){ if (buyUpgrade(id)) { sfx('upgrade'); save(); renderAll(); showShop(); } },
+  loc(id){ S.loc = id; sfx('tap'); save(); renderAll(); hideModal(); },
+  open: openStand,
+  speed(n){ setSpeed(+n); },
+  close(){ if (sim) sim.min = DAY_MIN; },
+  next(){ hideModal(); tab = 'supplies'; renderAll(); },
+  season: showSeason,
+};
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
   const [act, a, c] = b.dataset.act.split(':');
-  if (act === 'tab') { tab = a; renderBoard(); return; }
-  if (act === 'menu') { showMenu(); return; }
-  if (act === 'closemenu') { hideMenu(); return; }
-  if (act === 'dismiss') { if (modalDismiss) modalDismiss(); return; }
-  if (act === 'sel') { supplyItem = a; renderBoard(); return; }
-  if (act === 'showloc') { showLocations(); return; }
-  if (act === 'shop') { showShop(); return; }
-  if (act === 'buy') { if (buyPack(a, +c)) { sfx('buy'); save(); renderAll(); } return; }
-  if (act === 'rec') { changeRecipe(a, +c); save(); renderAll(); return; }
-  if (act === 'upg') { if (buyUpgrade(a)) { sfx('upgrade'); save(); renderAll(); showShop(); } return; }
-  if (act === 'loc') { S.loc = a; sfx('tap'); save(); renderAll(); hideModal(); return; }
-  if (act === 'open') { openStand(); return; }
-  if (act === 'speed') { setSpeed(+a); return; }
-  if (act === 'close') { if (sim) sim.min = DAY_MIN; return; }
-  if (act === 'next') { hideModal(); tab = 'supplies'; renderAll(); return; }
-  if (act === 'help') { showHelp(); return; }
-  if (act === 'season') { showSeason(); return; }
-  if (act === 'newgame') { confirmNewSeason(); return; }
-  if (shellAction(act, a, c, b)) return;
+  ACTIONS[act](a, c, b);
 });

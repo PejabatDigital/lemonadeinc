@@ -289,7 +289,7 @@ test('a cooler keeps half the ice, rounded down', () => {
 test('lemons go bad on their last day and younger ones age', () => {
   const r = loadGame().run(() => {
     stockUp(); S.cost.lemons = 0.25;
-    S.lemons = [{ n: 7, age: LEMON_LIFE - 1 }, { n: 5, age: LEMON_LIFE - 2 }];
+    S.lemons = [{ n: 7, age: BALANCE.lemonLife - 1 }, { n: 5, age: BALANCE.lemonLife - 2 }];
     openStand(); endDay();
     return { lemons: S.lemons, wLemons: S.ledger[0].wLemons };
   });

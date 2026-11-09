@@ -251,13 +251,15 @@ body.is-paused .paused-badge{ display:grid; }
 .ledger th:nth-child(-n+3), .ledger td:nth-child(-n+3){ text-align:left; }
 
 /* ---------- 6. Overlays: modal, sheet ---------- */
-.scrim{ position:fixed; inset:0; background:var(--overlay); opacity:0; pointer-events:none; transition:opacity var(--dur) ease; z-index:19; }
-.scrim.on{ opacity:1; pointer-events:auto; }
+/* Native <dialog>s. Transitioning overlay and display lets them animate as they close. */
+dialog{ border:0; background:var(--bg-surface); color:var(--text-primary); }
+dialog::backdrop{ background:var(--overlay, rgba(10,20,25,.55)); opacity:0; transition:opacity var(--dur) ease, overlay var(--dur) allow-discrete, display var(--dur) allow-discrete; }
+dialog[open]::backdrop{ opacity:1; }
+@starting-style{ dialog[open]::backdrop{ opacity:0; } }
 
-.modal{ position:fixed; inset:0; background:var(--overlay); display:flex; align-items:center; justify-content:center; padding:var(--s-4); z-index:30; opacity:0; visibility:hidden; transition:opacity var(--dur) ease, visibility 0s linear var(--dur); }
-.modal.on{ opacity:1; visibility:visible; transition:opacity var(--dur) ease; }
-.card{ background:var(--bg-surface); color:var(--text-primary); border-radius:var(--r-lg); max-width:480px; width:100%; max-height:calc(100% - 20px); overflow:auto; overscroll-behavior:contain; padding:var(--s-5); box-shadow:var(--shadow-overlay); transform:translateY(12px) scale(.98); transition:transform var(--dur) var(--ease); }
-.modal.on .card{ transform:none; }
+.card{ position:fixed; inset:0; margin:auto; z-index:30; height:fit-content; border-radius:var(--r-lg); max-width:480px; width:calc(100% - 2 * var(--s-4)); max-height:calc(100% - 52px); overflow:auto; overscroll-behavior:contain; padding:var(--s-5); box-shadow:var(--shadow-overlay); opacity:0; transform:translateY(12px) scale(.98); transition:opacity var(--dur) ease, transform var(--dur) var(--ease), overlay var(--dur) allow-discrete, display var(--dur) allow-discrete; }
+.card[open]{ opacity:1; transform:none; }
+@starting-style{ .card[open]{ opacity:0; transform:translateY(12px) scale(.98); } }
 .card:focus{ outline:none; }
 .card.wide{ max-width:640px; }
 .card h3{ font-family:var(--font-display); font-size:19px; margin:var(--s-4) 0 4px; }
@@ -275,12 +277,14 @@ body.is-paused .paused-badge{ display:grid; }
 .mini th:first-child, .mini td:first-child{ text-align:left; }
 
 /* In-game menu: right panel on wide screens, bottom sheet on phones */
-.sheet{ position:fixed; top:0; right:0; bottom:0; width:340px; max-width:88vw; background:var(--bg-surface); color:var(--text-primary); padding:var(--s-5) var(--s-4); padding-top:calc(var(--s-5) + env(safe-area-inset-top,0px)); transform:translateX(100%); transition:transform var(--dur) var(--ease), box-shadow var(--dur); z-index:20; overflow:auto; visibility:hidden; }
-.sheet.on{ transform:none; box-shadow:-8px 0 24px rgba(0,0,0,.25); visibility:visible; }
+.sheet{ position:fixed; inset:0 0 0 auto; margin:0; width:340px; max-width:88vw; height:auto; max-height:none; padding:var(--s-5) var(--s-4); padding-top:calc(var(--s-5) + env(safe-area-inset-top,0px)); transform:translateX(100%); transition:transform var(--dur) var(--ease), box-shadow var(--dur), overlay var(--dur) allow-discrete, display var(--dur) allow-discrete; z-index:20; overflow:auto; }
+.sheet[open]{ transform:none; box-shadow:-8px 0 24px rgba(0,0,0,.25); }
+@starting-style{ .sheet[open]{ transform:translateX(100%); } }
 .sheet .grab{ display:none; }
 @media (max-width:560px){
   .sheet{ top:auto; left:0; width:auto; max-width:none; max-height:88vh; border-radius:var(--r-xl) var(--r-xl) 0 0; padding:10px var(--s-4) calc(var(--s-5) + env(safe-area-inset-bottom,0px)); transform:translateY(100%); }
-  .sheet.on{ box-shadow:0 -8px 24px rgba(0,0,0,.25); }
+  .sheet[open]{ box-shadow:0 -8px 24px rgba(0,0,0,.25); }
+  @starting-style{ .sheet[open]{ transform:translateY(100%); } }
   .sheet .grab{ display:block; width:40px; height:5px; border-radius:3px; background:var(--border-default); margin:0 auto var(--s-3); }
 }
 

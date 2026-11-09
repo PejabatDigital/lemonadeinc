@@ -16,7 +16,7 @@ function openStand(){
   const tf = clamp((temp - 10) / 24, 0.15, 1.1);
   sim = {
     min:0, speed:1, walkers:[], queue:[], spawnAcc:0, serveT:0, pitcher:0, weather:type, temp, tf,
-    N: L.traffic * WEATHER[type].traffic * (1 + S.pop/150) * (S.upg.sign ? 1.15 : 1),
+    N: L.traffic * WEATHER[type].traffic * (1 + S.pop/150) * (S.upg.sign ? BALANCE.signTraffic : 1),
     maxPrice: L.tol * (0.55 + 0.55*tf) * (0.85 + S.pop/300),
     rent:L.rent, soldOut:null, popDelta:0, cogs:0, pcpc:0,
     stats:{ seen:0, sold:0, revenue:0, fb:{} },
@@ -36,14 +36,14 @@ function spawnWalker(){
 }
 function decide(w){
   w.decided = true; sim.stats.seen++;
-  const umbrella = S.upg.parasol && (sim.temp >= 30 || WEATHER[sim.weather].wet) ? 1.2 : 1;
+  const umbrella = S.upg.parasol && (sim.temp >= 30 || WEATHER[sim.weather].wet) ? BALANCE.parasolInterest : 1;
   const interest = clamp(sim.tf * (0.55 + S.pop/200) * WEATHER[sim.weather].want * umbrella, 0.05, 0.95);
   if (rng() > interest) return;
-  if (sim.soldOut) { say(w,'soldout'); fb('soldout'); sim.popDelta -= 0.15; return; }
+  if (sim.soldOut) { say(w,'soldout'); fb('soldout'); sim.popDelta -= BALANCE.popLoss.soldout; return; }
   const r = S.recipe.price / sim.maxPrice;
   const priceOk = r <= 0.5 ? 1 : clamp(1 - (r - 0.5)*1.6, 0, 1);
-  if (r > 1 || rng() > priceOk) { say(w,'pricey'); fb('pricey'); sim.popDelta -= 0.04; return; }
-  if (sim.queue.length >= 6) { say(w,'line'); fb('line'); sim.popDelta -= 0.08; return; }
+  if (r > 1 || rng() > priceOk) { say(w,'pricey'); fb('pricey'); sim.popDelta -= BALANCE.popLoss.pricey; return; }
+  if (sim.queue.length >= BALANCE.maxQueue) { say(w,'line'); fb('line'); sim.popDelta -= BALANCE.popLoss.line; return; }
   w.state = 'queue'; sim.queue.push(w);
 }
 function makePitcher(){
@@ -69,7 +69,7 @@ function taste(iceUsed){
   return { score, key };
 }
 function sellOutQueue(){
-  for (const q of sim.queue) { q.state = 'leave'; say(q,'soldout'); fb('soldout'); sim.popDelta -= 0.15; }
+  for (const q of sim.queue) { q.state = 'leave'; say(q,'soldout'); fb('soldout'); sim.popDelta -= BALANCE.popLoss.soldout; }
   sim.queue = [];
 }
 function serve(w){
@@ -111,13 +111,13 @@ function stepSim(dt){
   const f = sim.queue[0];
   if (f && f.arrived) {
     sim.serveT += dm;
-    if (sim.serveT >= (S.upg.register ? 4 : 8)) { sim.serveT = 0; serve(sim.queue.shift()); }
+    if (sim.serveT >= (S.upg.register ? BALANCE.registerServeMinutes : BALANCE.serveMinutes)) { sim.serveT = 0; serve(sim.queue.shift()); }
   } else sim.serveT = 0;
   if (sim.min >= DAY_MIN) endDay();
 }
 
 function endDay(){
-  const st = sim.stats, change = clamp(sim.popDelta, -12, 12);
+  const st = sim.stats, change = clamp(sim.popDelta, -BALANCE.popDailyLimit, BALANCE.popDailyLimit);
   const before = S.pop; S.pop = clamp(Math.round(S.pop + change), 0, 100);
   const notes = [];
   const wPitcher = sim.pitcher * sim.pcpc;
@@ -130,9 +130,9 @@ function endDay(){
     S.ice = kept;
   }
   S.lemons.forEach(b => b.age++);
-  const spoiled = sum(S.lemons.filter(b => b.age >= LEMON_LIFE), b => b.n);
+  const spoiled = sum(S.lemons.filter(b => b.age >= BALANCE.lemonLife), b => b.n);
   const wLemons = spoiled * S.cost.lemons;
-  S.lemons = S.lemons.filter(b => b.age < LEMON_LIFE);
+  S.lemons = S.lemons.filter(b => b.age < BALANCE.lemonLife);
   if (spoiled) notes.push(`${spoiled} lemons went bad.`);
   const waste = wPitcher + wIce + wLemons;
   const net = st.revenue - sim.cogs - waste - sim.rent;
