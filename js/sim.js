@@ -5,12 +5,8 @@
 // ---------- day simulation ----------
 function openStand(){
   const L = loc();
-  if (S.cash < L.rent) return;
-  const f = S.forecast;
-  let type = f.type;
-  if (Math.random() > 0.75) { const i = WORDER.indexOf(type); type = WORDER[clamp(i + (Math.random() < .5 ? -1 : 1), 0, WORDER.length-1)]; }
-  const [a,b] = WEATHER[type].t;
-  const temp = clamp(f.temp + rint(-2,2), a-2, b+2) + L.bias;
+  if (S.cash < L.rent || isStuck()) return;
+  const { type } = S.forecast.actual, temp = S.forecast.actual.temp + L.bias;
   addCash(-L.rent);
   const tf = clamp((temp - 10) / 24, 0.15, 1.1);
   sim = {
@@ -146,8 +142,9 @@ function endDay(){
     bought:S.spend, net, cash:S.cash, stock:stockValue(), pop:S.pop, price:S.recipe.price };
   S.ledger.push(row);
   const top = Object.entries(st.fb).filter(([k]) => k !== 'yum' && k !== 'ok').sort((a,b) => b[1]-a[1])[0];
+  const tipKey = top && (top[0] === 'line' && S.upg.register ? 'lineOwned' : top[0]);
   report = Object.assign({}, row, { popChange:S.pop - before, fb:st.fb, notes, locName:loc().name,
-    tip: top && top[1] >= 2 ? TIPS[top[0]] : null });
+    tip: top && top[1] >= 2 ? TIPS[tipKey] : null });
   S.day++; S.spend = 0; S.capex = 0; S.forecast = genForecast();
   if (S.day > SEASON && !S.seasonDone) { S.seasonDone = true; report.season = true; }
   sim = null;

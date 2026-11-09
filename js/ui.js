@@ -47,7 +47,15 @@ function renderSceneStats(){
     <span class="scene-badge weather">${w.icon} ${temp}°C</span>
     <span class="scene-badge cash">${money(S.cash)}</span>`;
 }
+// Redrawing replaces the buttons, so put keyboard focus back on the one that was pressed.
 function renderBoard(){
+  const at = document.activeElement, act = at && at.closest('#board, #openBar') ? at.dataset.act : null;
+  paintBoard();
+  if (!act) return;
+  const again = $(`[data-act="${act}"]:not(:disabled)`) || $('#board [role="tab"][aria-selected="true"]');
+  if (again) again.focus({ preventScroll:true });
+}
+function paintBoard(){
   const el = $('#board');
   $('#openBar').classList.toggle('on', !sim);
   if (sim) {
@@ -83,10 +91,11 @@ function renderBoard(){
   } else {
     body = renderBooks();
   }
-  const ready = cupsReady(), L = loc();
+  const ready = cupsReady(), L = loc(), stuck = isStuck();
   let msg = `Ready to sell about ${ready} cups at ${L.name}.`;
   if (L.rent) msg += ` Rent today is ${money(L.rent)}.`;
-  if (S.cash < L.rent) msg = `You need ${money(L.rent)} for rent here. Move somewhere cheaper.`;
+  if (stuck) msg = 'You’re out of cups and can’t afford more, so Lemonade Inc. is out of business. Start a new season to try again.';
+  else if (S.cash < L.rent) msg = `You need ${money(L.rent)} for rent here. Move somewhere cheaper.`;
   else if (!ready) msg = S.cups ? 'Not enough lemons or sugar for one pitcher.' : 'You have no cups. Buy some before opening.';
   else if (S.ice < S.recipe.i * Math.min(ready, 20)) msg += ' You are short on ice.';
   el.innerHTML = `<div class="tabs" role="tablist">${tabs.map(([k,n]) => `<button role="tab" aria-selected="${tab===k}" data-act="tab:${k}">${n}</button>`).join('')}</div>
@@ -94,7 +103,8 @@ function renderBoard(){
     <div class="panel"><div class="rows">${body}</div></div>
     <div class="go"><p>${msg}</p></div>`;
   $('#openBar').innerHTML = `<button class="loc-badge" data-act="showloc" aria-label="Location: ${L.name}. Change location">${icon('pin')}${L.name}</button>
-    <button class="btn btn--primary btn--lg" data-act="open" ${S.cash < L.rent ? 'disabled' : ''}>Open stand</button>`;
+    ${stuck ? '<button class="btn btn--primary btn--lg" data-act="newgame">New season</button>'
+      : `<button class="btn btn--primary btn--lg" data-act="open" ${S.cash < L.rent ? 'disabled' : ''}>Open stand</button>`}`;
 }
 function pricePanel(){
   const c = cupCost(), r = S.recipe, m = r.price - c.total, pct = r.price ? m / r.price * 100 : 0, L = loc();
@@ -238,12 +248,18 @@ function showModal(html, opts = {}){
 }
 function hideModal(){
   $('#modal').classList.remove('on'); modalDismiss = null;
-  if (modalReturn && modalReturn.focus && document.contains(modalReturn)) modalReturn.focus({ preventScroll:true });
+  if (modalReturn) {
+    // The button that opened the popup may have been redrawn while it was up; if so, find its replacement.
+    const act = modalReturn.dataset && modalReturn.dataset.act;
+    const el = document.contains(modalReturn) ? modalReturn : act ? $(`[data-act="${act}"]`) : null;
+    if (el && el.focus) el.focus({ preventScroll:true });
+  }
   modalReturn = null;
   if (typeof onOverlayChange === 'function') onOverlayChange();
 }
 const modalOpen = () => $('#modal').classList.contains('on');
-function showReport(){
+function showReport(){ openReport(); countUp($('#netv')); }
+function openReport(){
   const r = report, w = WEATHER[r.weather];
   const gross = r.sales - r.cogs, mpc = r.sold ? gross / r.sold : 0, pct = r.sales ? gross / r.sales * 100 : 0;
   const fbs = Object.entries(r.fb).sort((a,b) => b[1]-a[1]).slice(0,6).map(([k,n]) => `<li>${FB[k]} ×${n}</li>`).join('');
@@ -273,7 +289,6 @@ function showReport(){
       <div class="btn-row"><button class="btn btn--secondary" data-act="next">Keep playing</button><button class="btn btn--secondary" data-act="newgame">New season</button></div></div>`;
   } else html += `<div class="btn-stack"><button class="btn btn--primary btn--lg btn--block" data-act="next">Start day ${S.day}</button></div>`;
   showModal(html, { dismiss:false });
-  countUp($('#netv'));
 }
 function countUp(el){
   if (!el || reducedMotion()) return;

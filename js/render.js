@@ -40,7 +40,7 @@ function getScenery(id){
     const cols = ['#F4C3B0','#BFE0CF','#F6E09E','#C7D3F0','#F0BFD6','#D9E8B8'];
     for (let x = 6; x < W; x += 150 + R()*40) {
       if (Math.abs(x + 55 - STAND_X) < 20) continue;
-      items.push({ k:'house', x, w:100 + R()*30, h:62 + R()*24, c:cols[Math.floor(R()*cols.length)], chim:R() < .6, lit:R(), door:pick(['#7A4A32','#3F6E8C','#8C3B3B','#3F7A4E']) });
+      items.push({ k:'house', x, w:100 + R()*30, h:62 + R()*24, c:cols[Math.floor(R()*cols.length)], chim:R() < .6, lit:R(), door:['#7A4A32','#3F6E8C','#8C3B3B','#3F7A4E'][Math.floor(x) % 4] });
       items.push({ k:'tree', x:x + 135 + R()*10, s:0.8 + R()*0.4 });
     }
   } else if (id === 'park') {
@@ -410,6 +410,7 @@ function drawWalker(w, t){
 
 function saleFx(price){
   amb.fx.push({ k:'txt', x:STAND_X + 44, y:190, vy:-38, life:1.3, txt:'+' + money(price) });
+  if (reducedMotion()) return;
   for (let i = 0; i < 6; i++) amb.fx.push({ k:'sp', x:STAND_X + 28 + (Math.random()-0.5)*30, y:205, vx:(Math.random()-0.5)*80, vy:-40 - Math.random()*60, life:0.7 + Math.random()*0.4 });
 }
 function drawFx(dt){
@@ -457,7 +458,7 @@ function drawWeatherFx(t, dt){
       ctx.beginPath(); ctx.ellipse(0, 0, 5, 2.5, 0, 0, 7); ctx.fill(); ctx.restore();
     }
     if (Math.random() < dt*0.25) flash = 0.5;
-    if (flash > 0) { ctx.fillStyle = `rgba(255,255,255,${flash})`; ctx.fillRect(0, 0, W, H); flash -= dt*2; }
+    if (flash > 0 && dt) { ctx.fillStyle = `rgba(255,255,255,${flash})`; ctx.fillRect(0, 0, W, H); flash -= dt*2; }
   }
   const wm = warmth();
   if (wm > 0) {
@@ -470,7 +471,10 @@ function drawWeatherFx(t, dt){
   ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
 }
 
-function draw(t, dt){
+function draw(ts, realDt){
+  // Reduce motion holds the scenery and weather still and drops the lightning.
+  // Customers still walk (the day needs them) and sale effects still expire.
+  const still = reducedMotion(), t = still ? 0 : ts, dt = still ? 0 : realDt;
   ctx.clearRect(0, 0, W, H);
   drawBackground(S.loc, t, dt);
   const ws = sim ? sim.walkers : [];
@@ -478,6 +482,6 @@ function draw(t, dt){
   drawStand(t);
   const front = ws.filter(w => w.y >= 300).sort((a,b) => a.y - b.y);
   for (const w of front) drawWalker(w, t);
-  drawFx(dt);
+  drawFx(realDt);
   drawWeatherFx(t, dt);
 }

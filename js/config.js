@@ -48,7 +48,8 @@ const TIPS = {
   watery:'Use more lemons and sugar per pitcher.', strong:'Ease off the lemons and sugar a little.',
   ice:'Hot days need more ice per cup.', muchice:'It was cool out. Use less ice.',
   warm:'You ran out of ice. Buy more before opening.', pricey:'Lower your price, or build popularity first.',
-  line:'People gave up waiting. A cash register serves twice as fast.', soldout:'You ran out. Buy more supplies before opening.',
+  line:'People gave up waiting. A cash register serves twice as fast.',
+  lineOwned:'People gave up waiting, even with the register. A higher price will thin the line.', soldout:'You ran out. Buy more supplies before opening.',
 };
 
 // ---------- helpers ----------

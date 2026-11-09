@@ -9,8 +9,15 @@ let supplyItem = 'lemons';
 function genForecast(){
   let r = Math.random(), i = 0;
   while (i < WWEIGHT.length - 1 && r > WWEIGHT[i]) { r -= WWEIGHT[i]; i++; }
-  const type = WORDER[i], [a,b] = WEATHER[type].t;
-  return { type, temp: rint(a,b) };
+  const type = WORDER[i], [a,b] = WEATHER[type].t, temp = rint(a,b);
+  return { type, temp, actual:rollActual(type, temp) };
+}
+// What the day really turns out like. Decided along with the forecast and saved, so reloading can't re-roll it.
+function rollActual(type, temp){
+  let real = type;
+  if (Math.random() > 0.75) { const i = WORDER.indexOf(type); real = WORDER[clamp(i + (Math.random() < .5 ? -1 : 1), 0, WORDER.length-1)]; }
+  const [a,b] = WEATHER[real].t;
+  return { type:real, temp:clamp(temp + rint(-2,2), a-2, b+2) };
 }
 function newState(){
   return { v:1, day:1, cash:20, pop:10, lemons:[], sugar:0, ice:0, cups:0,
@@ -46,6 +53,7 @@ function normalize(d){
   d.cost = d.cost || {};
   for (const k in SHOP) if (d.cost[k] == null) d.cost[k] = refCost(k);
   d.ledger = d.ledger || []; d.upgLog = d.upgLog || {}; d.capex = d.capex || 0;
+  if (!d.forecast.actual) d.forecast.actual = rollActual(d.forecast.type, d.forecast.temp);
   for (const u of UPG) if (d.upg[u.id] && !d.upgLog[u.id]) d.upgLog[u.id] = { cost:u.cost, day:1 };
   return d;
 }
@@ -55,6 +63,8 @@ function cupsReady(){
   const pitchers = Math.min(l > 0 ? Math.floor(lemonCount()/l) : Infinity, s > 0 ? Math.floor(S.sugar/s) : Infinity);
   return Math.min(pitchers * yieldCups(), S.cups);
 }
+// Out of cups with no way to buy more. Any other shortage can be worked around by changing the recipe.
+const isStuck = () => S.cups <= 0 && S.cash < Math.min(...SHOP.cups.packs.map(p => p[1]));
 function useLemons(n){
   let left = n;
   for (const b of S.lemons) { const take = Math.min(b.n, left); b.n -= take; left -= take; if (!left) break; }

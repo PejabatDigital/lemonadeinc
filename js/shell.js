@@ -74,18 +74,18 @@ function onOverlayChange(){
   document.body.classList.toggle('is-paused', isPaused());
   document.body.classList.toggle('locked', titleOpen || menuOpen || modalOpen());
 }
-const hasProgress = () => !!sim || S.day > 1 || S.ledger.length > 0 || S.spend > 0;
+const hasProgress = () => !!sim || S.day > 1 || S.ledger.length > 0 || S.spend > 0 || S.capex > 0;
 
 // ---------- title screen ----------
 function renderTitle(){
   const prog = hasProgress();
   $('#titleActions').innerHTML = (prog
-      ? `<button class="btn btn--primary btn--lg btn--block" data-act="t-continue">${icon('play')}Continue · Day ${S.seasonDone ? S.day - 1 : S.day}</button>
+      ? `<button class="btn btn--primary btn--lg btn--block" data-act="t-continue">${icon('play')}Continue · Day ${S.day}</button>
          <button class="btn btn--secondary btn--lg btn--block" data-act="newgame">New season</button>`
       : `<button class="btn btn--primary btn--lg btn--block" data-act="t-play">${icon('play')}Play</button>`)
     + `<div class="btn-row"><button class="btn btn--secondary" data-act="help">${icon('help')}How to play</button>
        <button class="btn btn--secondary" data-act="settings">${icon('settings')}Settings</button></div>
-       <p class="title-foot">v${VERSION} · Your game saves on this device</p>`;
+       <p class="title-foot">v${VERSION} · ${sim ? 'Today’s trading saves when the day ends' : 'Your game saves on this device'}</p>`;
 }
 function showTitle(){
   titleOpen = true; renderTitle();
@@ -105,7 +105,7 @@ function menuItem(ic, label, act, note, opts = {}){
 function renderMenu(){
   const L = loc();
   $('#sheet').innerHTML = `<div class="grab" aria-hidden="true"></div>
-    <div class="popup-head"><div><h2 id="menuTitle">Menu</h2><p class="sub">Day ${S.seasonDone ? S.day - 1 : S.day}${S.seasonDone ? '' : ' of ' + SEASON} · ${L.name}${sim ? ' · day paused' : ''}</p></div>
+    <div class="popup-head"><div><h2 id="menuTitle">Menu</h2><p class="sub">Day ${S.day}${S.seasonDone ? '' : ' of ' + SEASON} · ${L.name}${sim ? ' · day paused' : ''}</p></div>
       <button class="iconbtn" data-act="closemenu" aria-label="Close menu">${icon('close')}</button></div>
     <nav class="menu-list" aria-labelledby="menuTitle">
       ${menuItem('shop', 'Shop', 'shop', 'One-time upgrades')}
@@ -154,7 +154,7 @@ function showHelp(step = 0){
       ${howStep ? '<button class="btn btn--secondary" data-act="how:prev">Back</button>' : '<button class="btn btn--secondary" data-act="how:done">Skip</button>'}
       <button class="btn btn--primary" data-act="how:${last ? 'done' : 'next'}">${last ? 'Let’s squeeze' : 'Next'}</button>
     </div>
-    <p class="fine">Your game saves automatically on this device.</p>`, { dismiss:finishHelp });
+    <p class="fine">Your game saves on this device between days. A day in progress restarts if you close the app.</p>`, { dismiss:finishHelp });
 }
 function finishHelp(){ S.seenHelp = true; save(); hideModal(); }
 
@@ -187,7 +187,7 @@ function confirmNewSeason(){
   const card = $('#card');
   nsBack = !modalOpen() ? null
     : card.querySelector('[data-act^="set:"]') ? showSettings
-    : (report && report.season && card.querySelector('[data-act="next"]')) ? () => showModal(card.innerHTML, { dismiss:false })
+    : (report && report.season && card.querySelector('[data-act="next"]')) ? openReport
     : card.querySelector('.tally') && S.seasonDone ? showSeason : null;
   hideMenu(true);
   const sub = S.seasonDone ? `Your season finished with ${money(S.total)} profit.` : `You’re on day ${S.day} with ${money(S.cash)} in the till.`;
