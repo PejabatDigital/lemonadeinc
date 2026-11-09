@@ -1,26 +1,27 @@
 /* Lemonade Inc. | sim.js
    The trading day: customers deciding, queueing, taste scoring, and the end-of-day books. */
-'use strict';
+import { W, STAND_X, QY, DAY_MIN, SEASON, BALANCE, WEATHER, FB, TIPS, clamp, rng } from './config.js';
+import { S, sim, report, setSim, setReport, genForecast, loc, idealIce, yieldCups, lemonCount, useLemons, addCash, sum, stockValue, isStuck, save } from './state.js';
 
 // The sim never touches the page. It announces 'open', 'sale' and 'end', and ui.js and shell.js react.
 const simListeners = {};
-const onSim = (event, fn) => (simListeners[event] = simListeners[event] || []).push(fn);
+export const onSim = (event, fn) => (simListeners[event] = simListeners[event] || []).push(fn);
 const emit = (event, ...args) => (simListeners[event] || []).forEach(fn => fn(...args));
 
 // ---------- day simulation ----------
-function openStand(){
+export function openStand(){
   const L = loc();
   if (S.cash < L.rent || isStuck()) return;
   const { type } = S.forecast.actual, temp = S.forecast.actual.temp + L.bias;
   addCash(-L.rent);
   const tf = clamp((temp - 10) / 24, 0.15, 1.1);
-  sim = {
+  setSim({
     min:0, speed:1, walkers:[], queue:[], spawnAcc:0, serveT:0, pitcher:0, weather:type, temp, tf,
     N: L.traffic * WEATHER[type].traffic * (1 + S.pop/150) * (S.upg.sign ? BALANCE.signTraffic : 1),
     maxPrice: L.tol * (0.55 + 0.55*tf) * (0.85 + S.pop/300),
     rent:L.rent, soldOut:null, popDelta:0, cogs:0, pcpc:0,
     stats:{ seen:0, sold:0, revenue:0, fb:{} },
-  };
+  });
   emit('open');
 }
 function fb(k){ sim.stats.fb[k] = (sim.stats.fb[k] || 0) + 1; }
@@ -34,7 +35,7 @@ function spawnWalker(){
   sim.walkers.push({ x: dir > 0 ? -30 : W+30, y:laneY, laneY, dir, spd:0.8 + rng()*0.5, hop:0, shiver:0,
     state:'walk', decided:false, arrived:false, bubble:null, bt:0, phase:rng()*6, cup:false });
 }
-function decide(w){
+export function decide(w){
   w.decided = true; sim.stats.seen++;
   const umbrella = S.upg.parasol && (sim.temp >= 30 || WEATHER[sim.weather].wet) ? BALANCE.parasolInterest : 1;
   const interest = clamp(sim.tf * (0.55 + S.pop/200) * WEATHER[sim.weather].want * umbrella, 0.05, 0.95);
@@ -53,7 +54,7 @@ function makePitcher(){
   sim.pcpc = (l*S.cost.lemons + s*S.cost.sugar) / yieldCups();
   useLemons(l); S.sugar -= s; sim.pitcher = yieldCups(); return true;
 }
-function taste(iceUsed){
+export function taste(iceUsed){
   const { l, s } = S.recipe, sour = l - s, str = l + s, ideal = idealIce(sim.temp);
   const terms = [
     ['sour', sour > 0 ? sour*0.11 : 0], ['sweet', sour < 0 ? -sour*0.11 : 0],
@@ -72,7 +73,7 @@ function sellOutQueue(){
   for (const q of sim.queue) { q.state = 'leave'; say(q,'soldout'); fb('soldout'); sim.popDelta -= BALANCE.popLoss.soldout; }
   sim.queue = [];
 }
-function serve(w){
+export function serve(w){
   if (S.cups <= 0) sim.soldOut = sim.soldOut || 'cups';
   if (!sim.soldOut && sim.pitcher <= 0) makePitcher();
   if (sim.soldOut) { sim.queue.unshift(w); sellOutQueue(); return; }
@@ -87,7 +88,7 @@ function serve(w){
   if (t.key === 'muchice') w.shiver = 1.4;
   w.state = 'leave'; w.cup = true;
 }
-function stepSim(dt){
+export function stepSim(dt){
   const dm = dt * sim.speed * 9;
   sim.min += dm;
   sim.spawnAcc += dm * sim.N / DAY_MIN;
@@ -116,7 +117,7 @@ function stepSim(dt){
   if (sim.min >= DAY_MIN) endDay();
 }
 
-function endDay(){
+export function endDay(){
   const st = sim.stats, change = clamp(sim.popDelta, -BALANCE.popDailyLimit, BALANCE.popDailyLimit);
   const before = S.pop; S.pop = clamp(Math.round(S.pop + change), 0, 100);
   const notes = [];
@@ -142,11 +143,11 @@ function endDay(){
   S.ledger.push(row);
   const top = Object.entries(st.fb).filter(([k]) => k !== 'yum' && k !== 'ok').sort((a,b) => b[1]-a[1])[0];
   const tipKey = top && (top[0] === 'line' && S.upg.register ? 'lineOwned' : top[0]);
-  report = Object.assign({}, row, { popChange:S.pop - before, fb:st.fb, notes, locName:loc().name,
-    tip: top && top[1] >= 2 ? TIPS[tipKey] : null });
+  setReport(Object.assign({}, row, { popChange:S.pop - before, fb:st.fb, notes, locName:loc().name,
+    tip: top && top[1] >= 2 ? TIPS[tipKey] : null }));
   S.day++; S.spend = 0; S.capex = 0; S.forecast = genForecast();
   if (S.day > SEASON && !S.seasonDone) { S.seasonDone = true; report.season = true; }
-  sim = null;
+  setSim(null);
   save();
   emit('end');
 }

@@ -1,41 +1,32 @@
-/* Loads the game rules with no browser. If config.js, state.js or sim.js touch the page, the tests crash. */
-'use strict';
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
+/* Sets up the real game modules with no browser. If config.js, state.js or sim.js touch the page, the tests crash. */
+import { STAND_X, QY, mulberry, setRng } from '../js/config.js';
+import { S, sim, newState, setState, setSim, setReport } from '../js/state.js';
+import { openStand, stepSim } from '../js/sim.js';
 
-const JS_DIR = path.join(__dirname, '..', 'js');
+export function stockUp(){ S.cash = 1000; S.cups = 500; S.sugar = 500; S.ice = 3000; S.lemons = [{ n:500, age:0 }]; }
+export function customer(){ return { state:'walk', decided:false, x:STAND_X, y:QY, laneY:330, dir:1, spd:1, phase:0, bt:0, hop:0, shiver:0 }; }
+export function playDay(){
+  openStand();
+  if (!sim) return null;
+  sim.speed = 4;
+  while (sim) stepSim(0.05);
+  return S.ledger[S.ledger.length - 1];
+}
 
-const HELPERS = `
-  function stockUp(){ S.cash = 1000; S.cups = 500; S.sugar = 500; S.ice = 3000; S.lemons = [{ n:500, age:0 }]; }
-  function customer(){ return { state:'walk', decided:false, x:STAND_X, y:QY, laneY:330, dir:1, spd:1, phase:0, bt:0, hop:0, shiver:0 }; }
-  function playDay(){
-    openStand();
-    if (!sim) return null;
-    sim.speed = 4;
-    while (sim) stepSim(0.05);
-    return S.ledger[S.ledger.length - 1];
-  }
-`;
-
-function loadGame(seed = 1) {
-  const context = vm.createContext({});
-  for (const file of ['config', 'state', 'sim']) {
-    const source = fs.readFileSync(path.join(JS_DIR, `${file}.js`), 'utf8');
-    vm.runInContext(source, context, { filename: `${file}.js` });
-  }
-  vm.runInContext(`${HELPERS}; rng = mulberry(${seed}); S = newState();`, context);
+// Starts a fresh game. run() returns a plain copy of the result, so later play can't change what a test saw.
+export function loadGame(seed = 1) {
+  setRng(mulberry(seed));
+  setSim(null);
+  setReport(null);
+  setState(newState());
   return {
-    // Runs fn inside the game. It can't see variables from the test file, so pass them as args.
     run(fn, ...args) {
-      const json = vm.runInContext(`JSON.stringify((${fn})(...${JSON.stringify(args)}))`, context);
-      return json === undefined ? undefined : JSON.parse(json);
+      const result = fn(...args);
+      return result === undefined ? undefined : JSON.parse(JSON.stringify(result));
     },
   };
 }
 
-function assertNear(actual, expected, tolerance = 1e-9) {
+export function assertNear(actual, expected, tolerance = 1e-9) {
   if (Math.abs(actual - expected) > tolerance) throw new Error(`expected ${actual} to be within ${tolerance} of ${expected}`);
 }
-
-module.exports = { loadGame, assertNear };

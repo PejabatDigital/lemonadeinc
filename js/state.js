@@ -1,61 +1,63 @@
 /* Lemonade Inc. | state.js
    Game state, saving/loading, stock and cost-per-cup calculations. */
-'use strict';
+import { BALANCE, SAVE_KEY, LOCS, SHOP, UPG, WEATHER, WORDER, rng, rint, clamp, money } from './config.js';
 
 // ---------- state ----------
-let S, sim = null, tab = 'supplies', report = null;
-let supplyItem = 'lemons';
+export let S, sim = null, report = null;
+export const setState = s => { S = s; };
+export const setSim = s => { sim = s; };
+export const setReport = r => { report = r; };
 
-function genForecast(){
+export function genForecast(){
   let r = rng(), i = 0;
   while (i < WORDER.length - 1 && r > WEATHER[WORDER[i]].weight) { r -= WEATHER[WORDER[i]].weight; i++; }
   const type = WORDER[i], [a,b] = WEATHER[type].t, temp = rint(a,b);
   return { type, temp, actual:rollActual(type, temp) };
 }
 // What the day really turns out like. Decided along with the forecast and saved, so reloading can't re-roll it.
-function rollActual(type, temp){
+export function rollActual(type, temp){
   let real = type;
   if (rng() < BALANCE.forecastMiss) { const i = WORDER.indexOf(type); real = WORDER[clamp(i + (rng() < .5 ? -1 : 1), 0, WORDER.length-1)]; }
   const [a,b] = WEATHER[real].t;
   return { type:real, temp:clamp(temp + rint(-2,2), a-2, b+2) };
 }
-function newState(){
+export function newState(){
   return { v:1, day:1, cash:BALANCE.startCash, pop:BALANCE.startPop, lemons:[], sugar:0, ice:0, cups:0,
     recipe:{ l:4, s:4, i:3, price:0.40 }, loc:'lane', upg:{}, forecast:genForecast(),
     spend:0, seasonDone:false, seenHelp:false,
     cost:Object.fromEntries(Object.keys(SHOP).map(k => [k, refCost(k)])), ledger:[], upgLog:{}, capex:0 };
 }
 // Only save between days: a mid-day save would store rent and sales without the day's ledger row.
-function save(){ if (sim) return; try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch(e){} }
-function load(){
+export function save(){ if (sim) return; try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch(e){} }
+export function load(){
   try { const raw = localStorage.getItem(SAVE_KEY); if (raw) { const d = JSON.parse(raw); if (d && d.v === 1) return normalize(d); } } catch(e){}
   return null;
 }
-const lemonCount = () => S.lemons.reduce((a,b) => a + b.n, 0);
-const locById = id => LOCS.find(l => l.id === id) || LOCS[0];
-const loc = () => locById(S.loc);
-const yieldCups = () => S.upg.juicer ? BALANCE.pressPitcherCups : BALANCE.pitcherCups;
-const idealIce = t => t >= 33 ? 5 : t >= 29 ? 4 : t >= 24 ? 3 : t >= 19 ? 2 : 1;
-const refCost = k => SHOP[k].packs[0][1] / SHOP[k].packs[0][0];
-const haveOf = k => k === 'lemons' ? lemonCount() : S[k];
-const unitCost = k => haveOf(k) > 0 ? S.cost[k] : refCost(k);
-const cents = n => Math.abs(n) < 1 ? (n < 0 ? '-' : '') + (Math.abs(n)*100).toFixed(1) + '¢' : money(n);
-const sum = (arr, f) => arr.reduce((a, x) => a + f(x), 0);
-const addCash = d => { S.cash = Math.round((S.cash + d) * 100) / 100; }; // keep cash in whole cents
-function cupCost(){
+export const lemonCount = () => S.lemons.reduce((a,b) => a + b.n, 0);
+export const locById = id => LOCS.find(l => l.id === id) || LOCS[0];
+export const loc = () => locById(S.loc);
+export const yieldCups = () => S.upg.juicer ? BALANCE.pressPitcherCups : BALANCE.pitcherCups;
+export const idealIce = t => t >= 33 ? 5 : t >= 29 ? 4 : t >= 24 ? 3 : t >= 19 ? 2 : 1;
+export const refCost = k => SHOP[k].packs[0][1] / SHOP[k].packs[0][0];
+export const haveOf = k => k === 'lemons' ? lemonCount() : S[k];
+export const unitCost = k => haveOf(k) > 0 ? S.cost[k] : refCost(k);
+export const cents = n => Math.abs(n) < 1 ? (n < 0 ? '-' : '') + (Math.abs(n)*100).toFixed(1) + '¢' : money(n);
+export const sum = (arr, f) => arr.reduce((a, x) => a + f(x), 0);
+export const addCash = d => { S.cash = Math.round((S.cash + d) * 100) / 100; }; // keep cash in whole cents
+export function cupCost(){
   const { l, s, i } = S.recipe, y = yieldCups();
   const c = { lemons:l*unitCost('lemons')/y, sugar:s*unitCost('sugar')/y, ice:i*unitCost('ice'), cups:unitCost('cups') };
   c.total = c.lemons + c.sugar + c.ice + c.cups;
   return c;
 }
-const stockValue = () => sum(Object.keys(SHOP), k => haveOf(k) * S.cost[k]);
-function seasonTotals(){
+export const stockValue = () => sum(Object.keys(SHOP), k => haveOf(k) * S.cost[k]);
+export function seasonTotals(){
   const fields = ['sold','sales','cogs','waste','wLemons','wIce','wPitcher','rent','net'];
   const t = Object.fromEntries(fields.map(k => [k, sum(S.ledger, r => r[k])]));
   t.avgMargin = t.sold ? (t.sales - t.cogs) / t.sold : 0;
   return t;
 }
-function normalize(d){
+export function normalize(d){
   d.cost = d.cost || {};
   for (const k in SHOP) if (d.cost[k] == null) d.cost[k] = refCost(k);
   d.ledger = d.ledger || []; d.upgLog = d.upgLog || {}; d.capex = d.capex || 0;
@@ -64,21 +66,21 @@ function normalize(d){
   return d;
 }
 
-function cupsReady(){
+export function cupsReady(){
   const { l, s } = S.recipe;
   const pitchers = Math.min(l > 0 ? Math.floor(lemonCount()/l) : Infinity, s > 0 ? Math.floor(S.sugar/s) : Infinity);
   return Math.min(pitchers * yieldCups(), S.cups);
 }
 // Out of cups with no way to buy more. Any other shortage can be worked around by changing the recipe.
-const isStuck = () => S.cups <= 0 && S.cash < Math.min(...SHOP.cups.packs.map(p => p[1]));
-function useLemons(n){
+export const isStuck = () => S.cups <= 0 && S.cash < Math.min(...SHOP.cups.packs.map(p => p[1]));
+export function useLemons(n){
   let left = n;
   for (const b of S.lemons) { const take = Math.min(b.n, left); b.n -= take; left -= take; if (!left) break; }
   S.lemons = S.lemons.filter(b => b.n > 0);
 }
 
 // ---------- player actions: each returns false if the game refuses it ----------
-function buyPack(k, i){
+export function buyPack(k, i){
   const [n, p] = SHOP[k].packs[i];
   if (S.cash < p) return false;
   const have = haveOf(k);
@@ -88,13 +90,13 @@ function buyPack(k, i){
   else S[k] += n;
   return true;
 }
-function buyUpgrade(id){
+export function buyUpgrade(id){
   const u = UPG.find(x => x.id === id);
   if (S.cash < u.cost || S.upg[id]) return false;
   addCash(-u.cost); S.capex += u.cost; S.upg[id] = true; S.upgLog[id] = { cost:u.cost, day:S.day };
   return true;
 }
-function changeRecipe(key, dir){
+export function changeRecipe(key, dir){
   const r = S.recipe;
   const { step, min, max } = BALANCE.price;
   if (key === 'price') r.price = +clamp(r.price + dir*step, min, max).toFixed(2);

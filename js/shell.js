@@ -1,78 +1,17 @@
 /* Lemonade Inc. | shell.js
-   Everything around the game: icons, settings, sound, title screen, in-game menu, how-to-play,
-   confirm dialogs, keyboard and focus handling, and pausing the day while a menu is open.
+   Everything around the game: title screen, in-game menu, how-to-play, settings screen and confirm dialogs.
    Matches the Figma file "Lemonade Inc. — Design System" (Components + Screens pages). */
-'use strict';
+import { SEASON, VERSION, BALANCE, $, clamp, money, icon } from './config.js';
+import { S, sim, setState, setSim, setReport, newState, loc, save, seasonTotals } from './state.js';
+import { onSim } from './sim.js';
+import { prefs, savePrefs, sysReduce, reducedMotion, applyPrefs, audio, sfx } from './settings.js';
+import { showModal, hideModal, hideMenu, modalOpen, currentRedraw, titleOpen, popupHead, onOverlayChange } from './dialogs.js';
+import { ACTIONS, renderAll, resetTab } from './ui.js';
 
-// ---------- icons (24px line set, same as Figma "Icon/*") ----------
-const ICONS = {
-  close:'<path d="M6 6l12 12M18 6L6 18"/>',
-  chevron:'<path d="M9 5l7 7-7 7"/>',
-  play:'<path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/>',
-  settings:'<path d="M4 8h9M17 8h3M4 16h3M11 16h9"/><circle cx="15" cy="8" r="2.2"/><circle cx="9" cy="16" r="2.2"/>',
-  help:'<circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.4 2.4c-.6.3-1 .8-1 1.5v.4"/><path d="M12 17h.01"/>',
-  shop:'<path d="M5 8h14l-1.2 12H6.2z"/><path d="M9 10V7a3 3 0 0 1 6 0v3"/>',
-  pin:'<path d="M12 21s-6.5-5.7-6.5-11a6.5 6.5 0 0 1 13 0c0 5.3-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>',
-  home:'<path d="M4 11.5L12 4l8 7.5"/><path d="M6.5 10v10h11V10"/>',
-  chart:'<path d="M5 20v-8M12 20V5M19 20v-5"/>',
-  reset:'<path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3L4.5 9"/><path d="M4.5 4.5V9H9"/>',
-  lock:'<rect x="6" y="11" width="12" height="9" rx="2"/><path d="M8.5 11V8.5a3.5 3.5 0 0 1 7 0V11"/>',
-  check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
-};
-const icon = (name, cls = 'icon') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`;
-
-// ---------- settings (kept apart from the game save so they survive a new season) ----------
-const PREFS_KEY = 'lemonade-inc-settings-v1';
-const prefs = Object.assign({ sound:true, theme:'auto', motion:'auto' }, (() => { try { return JSON.parse(localStorage.getItem(PREFS_KEY)) || {}; } catch(e){ return {}; } })());
-const savePrefs = () => { try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch(e){} };
-const sysReduce = matchMedia('(prefers-reduced-motion: reduce)');
-const reducedMotion = () => prefs.motion === 'reduce' || (prefs.motion === 'auto' && sysReduce.matches);
-function applyPrefs(){
-  const r = document.documentElement;
-  if (prefs.theme === 'light' || prefs.theme === 'dark') r.dataset.theme = prefs.theme; else delete r.dataset.theme;
-  r.classList.toggle('reduce-motion', prefs.motion === 'reduce');
-  r.classList.toggle('motion-on', prefs.motion === 'full');
-}
-
-// ---------- sound: tiny synthesized effects, no audio files ----------
-let actx = null, lastSale = 0;
-function audio(){
-  if (!prefs.sound) return null;
-  if (!actx) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; try { actx = new AC(); } catch(e){ return null; } }
-  if (actx.state === 'suspended') actx.resume().catch(() => {});
-  return actx;
-}
-function tone(ctx, t, freq, dur, type, vol){
-  const o = ctx.createOscillator(), g = ctx.createGain();
-  o.type = type; o.frequency.setValueAtTime(freq, t);
-  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + dur + 0.03);
-}
-function sfx(kind){
-  const ctx = audio(); if (!ctx || ctx.state !== 'running') return;
-  const t = ctx.currentTime + 0.01;
-  if (kind === 'tap') tone(ctx, t, 660, .07, 'triangle', .05);
-  else if (kind === 'buy') { tone(ctx, t, 880, .07, 'triangle', .06); tone(ctx, t + .06, 1320, .1, 'triangle', .05); }
-  else if (kind === 'upgrade') [523, 659, 784, 1047].forEach((f, i) => tone(ctx, t + i * .07, f, .16, 'triangle', .06));
-  else if (kind === 'open') { tone(ctx, t, 392, .12, 'triangle', .07); tone(ctx, t + .1, 523, .18, 'triangle', .07); }
-  else if (kind === 'day') [523, 659, 784].forEach((f, i) => tone(ctx, t + i * .09, f, .2, 'sine', .07));
-  else if (kind === 'sale') {
-    const now = performance.now(); if (now - lastSale < 110) return; lastSale = now;
-    tone(ctx, t, 1568, .05, 'square', .018); tone(ctx, t + .05, 2093, .12, 'square', .018);
-  }
-}
 onSim('sale', () => sfx('sale'));
 onSim('open', () => sfx('open'));
 onSim('end', () => sfx('day'));
 
-// ---------- overlay state: pause the trading day while a menu or popup is up ----------
-let titleOpen = false;
-const menuOpen = () => $('#sheet').open;
-const isPaused = () => !!sim && (titleOpen || menuOpen() || modalOpen());
-function onOverlayChange(){
-  document.body.classList.toggle('is-paused', isPaused());
-  document.body.classList.toggle('locked', titleOpen || menuOpen() || modalOpen());
-}
 const hasProgress = () => !!sim || S.day > 1 || S.ledger.length > 0 || S.spend > 0 || S.capex > 0;
 
 // ---------- title screen ----------
@@ -86,14 +25,14 @@ function renderTitle(){
        <button class="btn btn--secondary" data-act="settings">${icon('settings')}Settings</button></div>
        <p class="title-foot">v${VERSION} · ${sim ? 'Today’s trading saves when the day ends' : 'Your game saves on this device'}</p>`;
 }
-function showTitle(){
-  titleOpen = true; renderTitle();
+export function showTitle(){
+  renderTitle();
   $('#title').hidden = false; $('#game').inert = true;
   onOverlayChange();
   const b = $('#titleActions .btn'); if (b) b.focus({ preventScroll:true });
 }
 function hideTitle(){
-  titleOpen = false; $('#title').hidden = true; $('#game').inert = false;
+  $('#title').hidden = true; $('#game').inert = false;
   onOverlayChange();
 }
 
@@ -123,7 +62,6 @@ function showMenu(){
   onOverlayChange();
   const first = $('#sheet .menu-item:not(:disabled)'); if (first) first.focus({ preventScroll:true });
 }
-function hideMenu(){ $('#sheet').close(); }
 
 // ---------- how to play: 4 cards ----------
 const HOWTO = [
@@ -172,7 +110,7 @@ function setPref(key, val, btn){
 let nsBack = null;
 function confirmNewSeason(){
   if (!hasProgress()) { startNewSeason(); return; }
-  nsBack = modalOpen() ? modalRedraw : null; // so "Keep playing" returns to the popup we came from
+  nsBack = modalOpen() ? currentRedraw() : null; // so "Keep playing" returns to the popup we came from
   const sub = S.seasonDone ? `Your season finished with ${money(seasonTotals().net)} profit.` : `You’re on day ${S.day} with ${money(S.cash)} in the till.`;
   showModal(`${popupHead('Start a new season?', sub, false)}
     <p class="callout callout--warn">This wipes your current season, upgrades and books. It can’t be undone.</p>
@@ -181,10 +119,10 @@ function confirmNewSeason(){
 }
 function cancelNewSeason(){ const back = nsBack; nsBack = null; if (back) back(); else hideModal(); }
 function startNewSeason(){
-  if (sim) { sim = null; $('#hud').classList.remove('on'); }
-  S = newState(); S.seenHelp = true; report = null; tab = 'supplies';
+  if (sim) { setSim(null); $('#hud').classList.remove('on'); }
+  setState(newState()); S.seenHelp = true; setReport(null); resetTab();
   save(); hideModal(); hideMenu(); renderAll();
-  if (titleOpen) hideTitle();
+  if (titleOpen()) hideTitle();
   sfx('upgrade');
 }
 
@@ -203,23 +141,7 @@ Object.assign(ACTIONS, {
   ns(answer){ if (answer === 'yes') startNewSeason(); else cancelNewSeason(); },
 });
 
-// ---------- dialogs: tapping outside, closing, keyboard ----------
-function tappedOutside(e){
-  const d = e.currentTarget, r = d.getBoundingClientRect();
-  return e.target === d && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom);
-}
-$('#card').addEventListener('click', e => { if (tappedOutside(e) && modalDismiss) modalDismiss(); });
-$('#sheet').addEventListener('click', e => { if (tappedOutside(e)) hideMenu(); });
-$('#card').addEventListener('close', onOverlayChange);
-$('#sheet').addEventListener('close', () => { $('[data-act="menu"]').setAttribute('aria-expanded', 'false'); onOverlayChange(); });
-// A popup decides for itself whether it can be dismissed (phone back gestures arrive here).
-$('#card').addEventListener('cancel', e => { e.preventDefault(); if (modalDismiss) modalDismiss(); });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && modalOpen()) { // handled here too: browsers stop honouring preventDefault on a repeated cancel
-    e.preventDefault();
-    if (modalDismiss) modalDismiss();
-    return;
-  }
   if (modalOpen() && $('#card .howto') && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
     const n = howStep + (e.key === 'ArrowRight' ? 1 : -1);
     if (n >= 0 && n < HOWTO.length) { e.preventDefault(); showHelp(n); }

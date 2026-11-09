@@ -1,8 +1,9 @@
 /* Stock, costs, recipe limits, upgrades, saves and forecasts. */
-'use strict';
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const { loadGame, assertNear } = require('./load-game');
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { WORDER, WEATHER } from '../js/config.js';
+import { S, newState, buyPack, buyUpgrade, changeRecipe, lemonCount, useLemons, cupsReady, cupCost, unitCost, refCost, isStuck, addCash, idealIce, genForecast, normalize, seasonTotals } from '../js/state.js';
+import { loadGame, assertNear } from './load-game.js';
 
 test('buying stock averages the cost of everything you hold', () => {
   const r = loadGame().run(() => {

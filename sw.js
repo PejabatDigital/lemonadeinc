@@ -2,10 +2,10 @@
    Offline support. Network-first: when online you always get the latest version
    from the server; when offline the last copy you played is served from the cache.
    Bump CACHE when you add or rename files so old caches get cleared. */
-const CACHE = 'lemonade-inc-v4';
+const CACHE = 'lemonade-inc-v5';
 const ASSETS = [
   './', 'index.html', 'css/style.css',
-  'js/config.js', 'js/state.js', 'js/render.js', 'js/sim.js', 'js/ui.js', 'js/shell.js', 'js/main.js',
+  'js/config.js', 'js/state.js', 'js/settings.js', 'js/dialogs.js', 'js/render.js', 'js/sim.js', 'js/ui.js', 'js/shell.js', 'js/main.js',
   'assets/title.webp', 'assets/opening.webp', 'assets/bg-mid.webp', 'assets/bg-wide.webp',
   'manifest.webmanifest', 'icons/favicon-32.png', 'icons/apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png',
 ];

@@ -1,6 +1,13 @@
 /* Lemonade Inc. | main.js
    Game loop and start-up. The day only advances while no menu or popup is open. */
-'use strict';
+import { $ } from './config.js';
+import { sim, setState, load, newState } from './state.js';
+import { stepSim } from './sim.js';
+import { resize, renderFrame } from './render.js';
+import { applyPrefs } from './settings.js';
+import { isPaused, titleOpen } from './dialogs.js';
+import { renderAll } from './ui.js';
+import { showTitle } from './shell.js';
 
 // ---------- loop ----------
 let last = performance.now(), liveT = 0;
@@ -14,11 +21,11 @@ function frame(ts){
       liveT += dt; if (liveT > 0.25) { liveT = 0; renderAll(); }
     }
   }
-  draw(ts, dt);
+  if (!titleOpen()) renderFrame(dt, isPaused()); // the title screen covers the whole canvas
   requestAnimationFrame(frame);
 }
 
-S = load() || newState();
+setState(load() || newState());
 applyPrefs();
 resize();
 renderAll();

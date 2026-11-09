@@ -1,9 +1,16 @@
 /* Lemonade Inc. | ui.js
    Board and popups: stats bar, tabs, Books, charts, day report, season report, shop, location, button handling.
-   Title screen, menu, settings, how-to-play and confirm dialogs live in shell.js. */
-'use strict';
+   Title screen, menu, how-to-play, settings screen and confirm dialogs live in shell.js. */
+import { SEASON, DAY_MIN, BALANCE, LOCS, WEATHER, SHOP, UPG, FB, $, money, icon } from './config.js';
+import { S, sim, report, sum, cents, loc, locById, haveOf, yieldCups, lemonCount, cupCost, cupsReady, stockValue, seasonTotals, isStuck, save, buyPack, buyUpgrade, changeRecipe } from './state.js';
+import { onSim, openStand } from './sim.js';
+import { saleFx } from './render.js';
+import { sfx, reducedMotion } from './settings.js';
+import { showModal, hideModal, popupHead, dismissModal } from './dialogs.js';
 
 // ---------- UI ----------
+let tab = 'supplies', supplyItem = 'lemons';
+export const resetTab = () => { tab = 'supplies'; };
 const mobileMQ = window.matchMedia('(max-width:560px)');
 const isMobile = () => mobileMQ.matches;
 mobileMQ.addEventListener('change', () => renderBoard());
@@ -220,7 +227,7 @@ function showSeason(){
   showModal(html, { wide:true, redraw:showSeason });
 }
 
-function renderAll(){ renderStats(); renderSceneStats(); renderBoard(); }
+export function renderAll(){ renderStats(); renderSceneStats(); renderBoard(); }
 
 function setSpeed(n){
   if (!sim) return; sim.speed = n;
@@ -230,36 +237,6 @@ onSim('open', () => { $('#hud').classList.add('on'); setSpeed(1); renderAll(); }
 onSim('sale', saleFx);
 onSim('end', () => { $('#hud').classList.remove('on'); renderAll(); showReport(); });
 
-// Popups. opts: { wide, dismiss, redraw }. dismiss is what ✕ / Esc / tapping outside does: a function,
-// or false when the player has to pick one of the buttons (day report). redraw reopens this popup,
-// so a confirm shown on top of it can come back.
-let modalDismiss = null, modalRedraw = null, modalReturn = null;
-function popupHead(title, sub, close = true){
-  return `<div class="popup-head"><div><h2 id="dlgTitle">${title}</h2>${sub ? `<p class="sub">${sub}</p>` : ''}</div>
-    ${close ? `<button class="iconbtn" data-act="dismiss" aria-label="Close">${icon('close')}</button>` : ''}</div>`;
-}
-function showModal(html, opts = {}){
-  hideMenu();
-  const card = $('#card');
-  modalDismiss = opts.dismiss === undefined ? () => { hideModal(); renderAll(); } : opts.dismiss;
-  modalRedraw = opts.redraw || null;
-  card.classList.toggle('wide', !!opts.wide); card.innerHTML = html;
-  if (!card.open) { modalReturn = document.activeElement; card.showModal(); }
-  card.scrollTop = 0;
-  card.focus({ preventScroll:true });
-  onOverlayChange();
-}
-function hideModal(){
-  const opener = modalReturn;
-  modalDismiss = modalRedraw = modalReturn = null;
-  $('#card').close();
-  // close() refocuses the button that opened the popup, unless that button was redrawn while it was up.
-  if (opener && !document.contains(opener) && opener.dataset.act) {
-    const again = $(`[data-act="${opener.dataset.act}"]`);
-    if (again) again.focus({ preventScroll:true });
-  }
-}
-const modalOpen = () => $('#card').open;
 function showReport(){ openReport(); countUp($('#netv')); }
 function openReport(){
   const r = report, w = WEATHER[r.weather];
@@ -308,9 +285,9 @@ function showLocations(){
 }
 
 // What each data-act="name:a:c" button does. shell.js adds its own.
-const ACTIONS = {
+export const ACTIONS = {
   tab(name){ tab = name; renderBoard(); },
-  dismiss(){ if (modalDismiss) modalDismiss(); },
+  dismiss: dismissModal,
   sel(item){ supplyItem = item; renderBoard(); },
   showloc: showLocations,
   shop: showShop,

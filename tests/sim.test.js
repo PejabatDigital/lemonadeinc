@@ -1,8 +1,10 @@
 /* The trading day: opening, customers, serving, taste, end-of-day books. */
-'use strict';
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const { loadGame, assertNear } = require('./load-game');
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { DAY_MIN, SEASON, BALANCE, SHOP, UPG, TIPS, rint, rng, setRng } from '../js/config.js';
+import { S, sim, report, setState, setSim, newState, normalize, lemonCount, buyPack, buyUpgrade, stockValue } from '../js/state.js';
+import { openStand, onSim, taste, decide, serve, stepSim, endDay } from '../js/sim.js';
+import { loadGame, assertNear, stockUp, customer, playDay } from './load-game.js';
 
 test('opening charges rent and starts the day', () => {
   const r = loadGame().run(() => {
@@ -41,14 +43,14 @@ test('replaying a day from the same save gets the same weather', () => {
   const r = loadGame(3).run(() => {
     let changed = 0;
     for (let i = 0; i < 500; i++) {
-      S = newState(); S.cups = 1;
+      setState(newState()); S.cups = 1;
       const saved = JSON.stringify(S);
       openStand();
       const first = sim.weather + sim.temp;
-      sim = null; S = normalize(JSON.parse(saved));
+      setSim(null); setState(normalize(JSON.parse(saved)));
       openStand();
       if (sim.weather + sim.temp !== first) changed++;
-      sim = null;
+      setSim(null);
     }
     return changed;
   });
@@ -69,9 +71,9 @@ test('taste feedback names what is wrong', () => {
   ];
   for (const c of cases) {
     const got = loadGame().run(k => {
-      rng = () => 0.5;
+      setRng(() => 0.5);
       S.recipe.l = k.l; S.recipe.s = k.s; S.recipe.price = k.price || 0.4;
-      sim = { temp: k.temp, maxPrice: 2 };
+      setSim({ temp: k.temp, maxPrice: 2 });
       return taste(k.ice).key;
     }, c);
     assert.equal(got, c.want, JSON.stringify(c));
@@ -80,9 +82,9 @@ test('taste feedback names what is wrong', () => {
 
 test('a small flaw on a bad roll is just pretty good', () => {
   const r = loadGame().run(() => {
-    rng = () => 0;
+    setRng(() => 0);
     S.recipe.l = 4; S.recipe.s = 4; S.recipe.price = 1.8;
-    sim = { temp: 28, maxPrice: 2 };
+    setSim({ temp: 28, maxPrice: 2 });
     return taste(2).key;
   });
   assert.equal(r, 'ok');
@@ -110,7 +112,7 @@ test('interest depends on the weather, and the parasol only helps when hot or we
     stockUp(); S.recipe.price = 0.1; S.pop = 30; S.upg.parasol = k.parasol;
     openStand();
     sim.tf = 0.5; sim.weather = k.weather; sim.temp = k.temp;
-    rng = () => k.roll;
+    setRng(() => k.roll);
     const w = customer();
     decide(w);
     return w.state === 'queue';
@@ -128,7 +130,7 @@ test('good lemonade raises popularity and bad lemonade lowers it', () => {
     stockUp(); S.recipe.l = lemons; S.recipe.s = sugar; S.recipe.i = 3; S.recipe.price = 0.1;
     openStand();
     sim.temp = 28; sim.maxPrice = 2;
-    rng = () => 0.5;
+    setRng(() => 0.5);
     serve(customer());
     return sim.popDelta;
   }, l, s);
@@ -141,7 +143,7 @@ function decideWith(setup) {
     stockUp();
     S.recipe.price = 0.1;
     openStand();
-    rng = () => 0;
+    setRng(() => 0);
     new Function('sim', 'S', body)(sim, S);
     const w = customer();
     decide(w);
@@ -156,7 +158,7 @@ test('an interested customer at a fair price joins the line', () => {
 test('an uninterested customer walks past and says nothing', () => {
   const r = loadGame().run(() => {
     stockUp(); openStand();
-    rng = () => 0.99;
+    setRng(() => 0.99);
     const w = customer();
     decide(w);
     return { state: w.state, seen: sim.stats.seen, fb: sim.stats.fb };
@@ -397,7 +399,7 @@ test('the books balance over many randomly played seasons', () => {
     const r = loadGame(seed).run(() => {
       let worstCash = 0, worstStock = 0, days = 0, sold = 0;
       for (let season = 0; season < 5; season++) {
-        S = newState(); S.cash = 300;
+        setState(newState()); S.cash = 300;
         for (let d = 0; d < 30; d++) {
           S.recipe.l = rint(1, 8); S.recipe.s = rint(1, 8); S.recipe.i = rint(0, 5); S.recipe.price = rint(1, 16) * 0.05;
           for (const k of Object.keys(SHOP)) for (let i = 0; i < 3; i++) if (rng() < 0.5) buyPack(k, rint(0, 2));

@@ -1,18 +1,23 @@
 /* Lemonade Inc. | render.js
    Everything drawn on the canvas: sky, locations, stand, customers, weather and effects. */
-'use strict';
+import { W, H, STAND_X, DAY_MIN, WEATHER, $, clamp, money, pick, mulberry } from './config.js';
+import { S, sim, yieldCups } from './state.js';
+import { reducedMotion } from './settings.js';
 
 // ---------- canvas ----------
-const cv = $('#cv'), ctx = cv.getContext('2d');
-function resize(){
+const cv = $('#cv');
+let ctx = cv.getContext('2d'), sceneScale = 1;
+export function resize(){
   const r = cv.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2);
+  if (!r.width || !r.height) return;
   cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
   // "Cover" the box with the fixed W×H scene, cropping the overflow rather than letterboxing.
   // On the box's native 960:440 ratio this reduces to the old fit-exactly behaviour (no overflow).
   const scale = Math.max(r.width / W, r.height / H);
   const ox = (r.width - W * scale) / 2;
   const oy = -(H * scale - r.height) * 0.65; // bias the crop toward the lower half, where the stand sits
-  ctx.setTransform(scale * dpr, 0, 0, scale * dpr, ox * dpr, oy * dpr);
+  sceneScale = scale * dpr;
+  ctx.setTransform(sceneScale, 0, 0, sceneScale, Math.round(ox * dpr), Math.round(oy * dpr)); // whole pixels keep the backdrop crisp
 }
 new ResizeObserver(resize).observe(cv);
 
@@ -122,121 +127,83 @@ function drawTree(x, s, base = 258){
   circ(x-13*s, base-58*s, 5*s, '#7BCB7B');
 }
 
-function drawBackground(id, t, dt){
-  drawSky(t);
-  const items = getScenery(id), wm = warmth();
-  if (id === 'beach') {
-    const sg = ctx.createLinearGradient(0, 195, 0, 252); sg.addColorStop(0, mix('#2A86BD', '#C77B5A', wm*0.35)); sg.addColorStop(1, '#6CC7E8');
-    ctx.fillStyle = sg; ctx.fillRect(0, 195, W, 60);
-    drawFar(id);
-    ctx.strokeStyle = 'rgba(255,255,255,.65)'; ctx.lineWidth = 2;
-    for (let i = 0; i < 14; i++) { const wx = (i*83 + t*0.02) % (W+60) - 30; ctx.beginPath(); ctx.arc(wx, 226 + (i%3)*8, 9, Math.PI, 0); ctx.stroke(); }
-    // sailboat
-    amb.boat.x = (amb.boat.x + dt*9) % (W + 80);
-    const bx = amb.boat.x - 40, by = 210 + Math.sin(t/600)*1.5;
-    ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx, by-30); ctx.lineTo(bx+20, by); ctx.fill();
-    ctx.fillStyle = '#E8574A'; ctx.beginPath(); ctx.moveTo(bx-2, by-24); ctx.lineTo(bx-2, by); ctx.lineTo(bx-14, by); ctx.fill();
-    ctx.fillStyle = '#6B4A30'; ctx.beginPath(); ctx.moveTo(bx-16, by+1); ctx.lineTo(bx+22, by+1); ctx.lineTo(bx+16, by+7); ctx.lineTo(bx-12, by+7); ctx.fill();
-    // gulls
-    ctx.strokeStyle = '#3A4650'; ctx.lineWidth = 2;
-    for (const g of amb.gulls) {
-      g.x = (g.x + g.v*dt) % (W + 40); g.ph += dt*6;
-      const f = Math.sin(g.ph)*4, gx = g.x - 20;
-      ctx.beginPath(); ctx.moveTo(gx-8, g.y - f); ctx.quadraticCurveTo(gx-4, g.y-4, gx, g.y); ctx.quadraticCurveTo(gx+4, g.y-4, gx+8, g.y - f); ctx.stroke();
+// ---------- the backdrop: everything that never moves, painted once onto an offscreen canvas ----------
+const PAINT = {
+  house(it, wm){
+    const by = 258, x = it.x, w = it.w, h = it.h;
+    shadowAt(x + w/2 + 6, by + 1, w*0.58, 5, .16);
+    if (it.chim) { ctx.fillStyle = '#8A5A48'; ctx.fillRect(x + w*0.7, by-h-34, 12, 26); }
+    ctx.fillStyle = it.c; ctx.fillRect(x, by-h, w, h);
+    ctx.fillStyle = shade(it.c, -0.13); ctx.fillRect(x + w*0.8, by-h, w*0.2, h);
+    ctx.fillStyle = 'rgba(0,0,0,.05)'; for (let yy = by-h+7; yy < by; yy += 8) ctx.fillRect(x, yy, w, 1);
+    ctx.fillStyle = '#A5503F'; ctx.beginPath(); ctx.moveTo(x-8, by-h); ctx.lineTo(x+w/2, by-h-38); ctx.lineTo(x+w/2, by-h); ctx.fill();
+    ctx.fillStyle = '#833E30'; ctx.beginPath(); ctx.moveTo(x+w/2, by-h-38); ctx.lineTo(x+w+8, by-h); ctx.lineTo(x+w/2, by-h); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.fillRect(x, by-h, w, 4);
+    const lit = wm > 0.35 && it.lit < 0.7, glass = lit ? '#FFD98A' : '#BFE3F5';
+    for (const wx of [x+12, x+w-36]) {
+      ctx.fillStyle = '#FFFFFF'; ctx.fillRect(wx-2, by-h+12, 26, 22);
+      ctx.fillStyle = glass; ctx.fillRect(wx, by-h+14, 22, 18);
+      ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fillRect(wx+10, by-h+14, 2, 18); ctx.fillRect(wx, by-h+22, 22, 2);
     }
+    ctx.fillStyle = it.door; ctx.fillRect(x+w/2-10, by-32, 20, 32);
+    circ(x+w/2+5, by-16, 1.8, '#F0C23E');
+    ctx.fillStyle = '#CFC6B8'; ctx.fillRect(x+w/2-14, by-3, 28, 3);
+  },
+  tree(it){ drawTree(it.x, it.s, it.y || 258); },
+  pond(it){
+    ctx.fillStyle = '#4C9F4A'; ctx.beginPath(); ctx.ellipse(it.x, 273, it.w/2 + 6, 20, 0, 0, 7); ctx.fill();
+    const pg = ctx.createLinearGradient(0, 255, 0, 290); pg.addColorStop(0, '#4FA6CF'); pg.addColorStop(1, '#76C4E3');
+    ctx.fillStyle = pg; ctx.beginPath(); ctx.ellipse(it.x, 273, it.w/2, 16, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.fillRect(it.x - 40, 268, 30, 2); ctx.fillRect(it.x + 20, 276, 22, 2);
+    ctx.strokeStyle = '#3E7F3A'; ctx.lineWidth = 2;
+    for (let r = 0; r < 5; r++) { const rx = it.x - it.w/2 + 4 + r*5; ctx.beginPath(); ctx.moveTo(rx, 272); ctx.lineTo(rx - 2 + r, 254 + r*2); ctx.stroke(); }
+  },
+  bench(it){
+    shadowAt(it.x, 270, 28, 3, .18);
+    ctx.fillStyle = '#8A5A34'; ctx.fillRect(it.x-26, 256, 52, 5); ctx.fillRect(it.x-26, 247, 52, 4);
+    ctx.fillStyle = '#4A4F55'; ctx.fillRect(it.x-22, 261, 3, 9); ctx.fillRect(it.x+19, 261, 3, 9);
+  },
+  tower(it, wm){
+    const x = it.x, w = it.w, h = it.h, g = ctx.createLinearGradient(x, 0, x+w, 0);
+    g.addColorStop(0, shade(it.c, 0.1)); g.addColorStop(1, shade(it.c, -0.18));
+    ctx.fillStyle = g; ctx.fillRect(x, 258-h, w, h);
+    ctx.fillStyle = shade(it.c, -0.3); ctx.fillRect(x-2, 258-h-5, w+4, 6);
+    if (it.ant) { ctx.fillStyle = '#5B6670'; ctx.fillRect(x + w/2 - 1, 258-h-26, 2, 22); circ(x + w/2, 258-h-27, 2.5, wm > .3 ? '#FF5A4A' : '#9AA5AE'); }
+    let k = it.seed;
+    for (let wy = 258-h+10; wy < 246; wy += 18) for (let wx = x+8; wx < x+w-12; wx += 16) {
+      k = (k * 9301 + 49297) % 233280;
+      const on = k / 233280 < it.lit*0.35 + wm*0.45;
+      ctx.fillStyle = on ? '#FFE3A0' : 'rgba(35,55,75,.38)'; ctx.fillRect(wx, wy, 9, 11);
+      if (!on) { ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(wx, wy, 3, 11); }
+    }
+  },
+  palm(it){
+    const x = it.x, s = it.s, base = 262;
+    shadowAt(x + 14*s, base + 1, 30*s, 5*s, .18);
+    ctx.strokeStyle = '#8A6238'; ctx.lineWidth = 9*s; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x, base); ctx.quadraticCurveTo(x+12*s, base-50*s, x+4*s, base-95*s); ctx.stroke();
+    ctx.strokeStyle = 'rgba(70,45,20,.45)'; ctx.lineWidth = 2;
+    for (let k = 1; k < 8; k++) { const yy = base - k*12*s, xx = x + Math.sin(k/8*Math.PI)*9*s; ctx.beginPath(); ctx.moveTo(xx-4*s, yy); ctx.lineTo(xx+4*s, yy-2); ctx.stroke(); }
+  },
+};
+
+function paintGround(id){
+  if (id === 'beach') {
     const sand = ctx.createLinearGradient(0, 250, 0, 295); sand.addColorStop(0, '#F4DDA8'); sand.addColorStop(1, '#E6C88A');
     ctx.fillStyle = sand; ctx.fillRect(0, 250, W, 45);
-  } else {
-    drawFar(id);
-    const gg = ctx.createLinearGradient(0, 250, 0, 295);
-    if (id === 'downtown') { gg.addColorStop(0, '#9AA3A9'); gg.addColorStop(1, '#858E95'); }
-    else { gg.addColorStop(0, '#8FCD6D'); gg.addColorStop(1, '#6FB555'); }
-    ctx.fillStyle = gg; ctx.fillRect(0, 250, W, 45);
+    return;
   }
-
-  for (const it of items) {
-    if (it.k === 'house') {
-      const by = 258, x = it.x, w = it.w, h = it.h;
-      shadowAt(x + w/2 + 6, by + 1, w*0.58, 5, .16);
-      if (it.chim) { ctx.fillStyle = '#8A5A48'; ctx.fillRect(x + w*0.7, by-h-34, 12, 26); }
-      ctx.fillStyle = it.c; ctx.fillRect(x, by-h, w, h);
-      ctx.fillStyle = shade(it.c, -0.13); ctx.fillRect(x + w*0.8, by-h, w*0.2, h);
-      ctx.fillStyle = 'rgba(0,0,0,.05)'; for (let yy = by-h+7; yy < by; yy += 8) ctx.fillRect(x, yy, w, 1);
-      ctx.fillStyle = '#A5503F'; ctx.beginPath(); ctx.moveTo(x-8, by-h); ctx.lineTo(x+w/2, by-h-38); ctx.lineTo(x+w/2, by-h); ctx.fill();
-      ctx.fillStyle = '#833E30'; ctx.beginPath(); ctx.moveTo(x+w/2, by-h-38); ctx.lineTo(x+w+8, by-h); ctx.lineTo(x+w/2, by-h); ctx.fill();
-      ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.fillRect(x, by-h, w, 4);
-      const lit = wm > 0.35 && it.lit < 0.7, glass = lit ? '#FFD98A' : '#BFE3F5';
-      for (const wx of [x+12, x+w-36]) {
-        ctx.fillStyle = '#FFFFFF'; ctx.fillRect(wx-2, by-h+12, 26, 22);
-        ctx.fillStyle = glass; ctx.fillRect(wx, by-h+14, 22, 18);
-        ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fillRect(wx+10, by-h+14, 2, 18); ctx.fillRect(wx, by-h+22, 22, 2);
-      }
-      ctx.fillStyle = it.door; ctx.fillRect(x+w/2-10, by-32, 20, 32);
-      circ(x+w/2+5, by-16, 1.8, '#F0C23E');
-      ctx.fillStyle = '#CFC6B8'; ctx.fillRect(x+w/2-14, by-3, 28, 3);
-    } else if (it.k === 'tree') drawTree(it.x, it.s, it.y || 258);
-    else if (it.k === 'pond') {
-      ctx.fillStyle = '#4C9F4A'; ctx.beginPath(); ctx.ellipse(it.x, 273, it.w/2 + 6, 20, 0, 0, 7); ctx.fill();
-      const pg = ctx.createLinearGradient(0, 255, 0, 290); pg.addColorStop(0, '#4FA6CF'); pg.addColorStop(1, '#76C4E3');
-      ctx.fillStyle = pg; ctx.beginPath(); ctx.ellipse(it.x, 273, it.w/2, 16, 0, 0, 7); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.fillRect(it.x - 40, 268, 30, 2); ctx.fillRect(it.x + 20, 276, 22, 2);
-      for (const d of amb.ducks) {
-        d.a += dt*0.18;
-        const dx = it.x + Math.cos(d.a)*it.w*0.32, dy = 273 + Math.sin(d.a)*6, dir = -Math.sin(d.a) >= 0 ? 1 : -1;
-        circ(dx, dy, 5, '#FFFFFF'); circ(dx + dir*5, dy-5, 3.2, '#FFFFFF');
-        ctx.fillStyle = '#F0A030'; ctx.fillRect(dir > 0 ? dx+7 : dx-10, dy-6, 3, 2);
-      }
-      ctx.strokeStyle = '#3E7F3A'; ctx.lineWidth = 2;
-      for (let r = 0; r < 5; r++) { const rx = it.x - it.w/2 + 4 + r*5; ctx.beginPath(); ctx.moveTo(rx, 272); ctx.lineTo(rx - 2 + r, 254 + r*2); ctx.stroke(); }
-    } else if (it.k === 'bench') {
-      shadowAt(it.x, 270, 28, 3, .18);
-      ctx.fillStyle = '#8A5A34'; ctx.fillRect(it.x-26, 256, 52, 5); ctx.fillRect(it.x-26, 247, 52, 4);
-      ctx.fillStyle = '#4A4F55'; ctx.fillRect(it.x-22, 261, 3, 9); ctx.fillRect(it.x+19, 261, 3, 9);
-    } else if (it.k === 'tower') {
-      const x = it.x, w = it.w, h = it.h, g = ctx.createLinearGradient(x, 0, x+w, 0);
-      g.addColorStop(0, shade(it.c, 0.1)); g.addColorStop(1, shade(it.c, -0.18));
-      ctx.fillStyle = g; ctx.fillRect(x, 258-h, w, h);
-      ctx.fillStyle = shade(it.c, -0.3); ctx.fillRect(x-2, 258-h-5, w+4, 6);
-      if (it.ant) { ctx.fillStyle = '#5B6670'; ctx.fillRect(x + w/2 - 1, 258-h-26, 2, 22); circ(x + w/2, 258-h-27, 2.5, wm > .3 ? '#FF5A4A' : '#9AA5AE'); }
-      let k = it.seed;
-      for (let wy = 258-h+10; wy < 246; wy += 18) for (let wx = x+8; wx < x+w-12; wx += 16) {
-        k = (k * 9301 + 49297) % 233280;
-        const on = k / 233280 < it.lit*0.35 + wm*0.45;
-        ctx.fillStyle = on ? '#FFE3A0' : 'rgba(35,55,75,.38)'; ctx.fillRect(wx, wy, 9, 11);
-        if (!on) { ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(wx, wy, 3, 11); }
-      }
-    } else if (it.k === 'palm') {
-      const x = it.x, s = it.s, base = 262;
-      shadowAt(x + 14*s, base + 1, 30*s, 5*s, .18);
-      ctx.strokeStyle = '#8A6238'; ctx.lineWidth = 9*s; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(x, base); ctx.quadraticCurveTo(x+12*s, base-50*s, x+4*s, base-95*s); ctx.stroke();
-      ctx.strokeStyle = 'rgba(70,45,20,.45)'; ctx.lineWidth = 2;
-      for (let k = 1; k < 8; k++) { const yy = base - k*12*s, xx = x + Math.sin(k/8*Math.PI)*9*s; ctx.beginPath(); ctx.moveTo(xx-4*s, yy); ctx.lineTo(xx+4*s, yy-2); ctx.stroke(); }
-      const sway = Math.sin(t/900 + x)*0.06;
-      for (let k = 0; k < 6; k++) {
-        const ang = -Math.PI/2 + (k-2.5)*0.62 + sway;
-        ctx.fillStyle = k % 2 ? '#2E9A4E' : '#23803F';
-        ctx.beginPath(); ctx.ellipse(x+4*s + Math.cos(ang)*27*s, base-95*s + Math.sin(ang)*14*s + 9*s, 31*s, 7*s, ang, 0, 7); ctx.fill();
-      }
-      circ(x+1*s, base-90*s, 4*s, '#6B4A2A'); circ(x+8*s, base-89*s, 4*s, '#5A3C22');
-    }
-  }
-
-  if (id === 'downtown') {
-    ctx.fillStyle = '#5F666C'; ctx.fillRect(0, 262, W, 30);
-    ctx.fillStyle = '#E8E2C8'; for (let x = 0; x < W; x += 50) ctx.fillRect(x, 276, 26, 2);
-    for (const c of amb.cars) {
-      c.x += c.dir * c.v * dt; if (c.x > W + 60) c.x = -60; if (c.x < -60) c.x = W + 60;
-      const cy = c.dir > 0 ? 286 : 272;
-      shadowAt(c.x, cy + 1, 24, 3, .25);
-      ctx.fillStyle = c.c; rr(c.x-24, cy-12, 48, 11, 4); ctx.fill(); rr(c.x-13, cy-20, 26, 10, 4); ctx.fill();
-      ctx.fillStyle = '#CDE8F5'; ctx.fillRect(c.x-10, cy-18, 9, 6); ctx.fillRect(c.x+1, cy-18, 9, 6);
-      circ(c.x-14, cy-1, 4, '#2A2E33'); circ(c.x+14, cy-1, 4, '#2A2E33');
-      circ(c.x + c.dir*23, cy-8, 2, wm > .3 ? '#FFF1B0' : '#F7F3E0');
-    }
-  }
-
-  // sidewalk / boardwalk
+  drawFar(id);
+  const gg = ctx.createLinearGradient(0, 250, 0, 295);
+  if (id === 'downtown') { gg.addColorStop(0, '#9AA3A9'); gg.addColorStop(1, '#858E95'); }
+  else { gg.addColorStop(0, '#8FCD6D'); gg.addColorStop(1, '#6FB555'); }
+  ctx.fillStyle = gg; ctx.fillRect(0, 250, W, 45);
+}
+function paintRoad(){
+  ctx.fillStyle = '#5F666C'; ctx.fillRect(0, 262, W, 30);
+  ctx.fillStyle = '#E8E2C8'; for (let x = 0; x < W; x += 50) ctx.fillRect(x, 276, 26, 2);
+}
+function paintWalkway(id){
   if (id === 'beach') {
     const bw = ctx.createLinearGradient(0, 295, 0, H); bw.addColorStop(0, '#CFA06A'); bw.addColorStop(1, '#B98A55');
     ctx.fillStyle = bw; ctx.fillRect(0, 295, W, H-295);
@@ -252,15 +219,100 @@ function drawBackground(id, t, dt){
     for (let x = 0; x < W + 40; x += 64) { ctx.beginPath(); ctx.moveTo(x, 298); ctx.lineTo(x-24, H); ctx.stroke(); }
     ctx.beginPath(); ctx.moveTo(0, 360); ctx.lineTo(W, 360); ctx.stroke();
   }
-  if (isWet()) {
-    for (const [px, py, pr] of [[150, 412, 44], [700, 424, 56], [880, 356, 30], [300, 350, 24]]) {
-      ctx.fillStyle = 'rgba(110,140,165,.42)'; ctx.beginPath(); ctx.ellipse(px, py, pr, pr*0.22, 0, 0, 7); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.beginPath(); ctx.ellipse(px - pr*0.3, py - 2, pr*0.35, pr*0.05, 0, 0, 7); ctx.fill();
-      const rp = ((t/700 + px) % 1);
-      ctx.strokeStyle = `rgba(230,240,250,${0.5*(1-rp)})`; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.ellipse(px + pr*0.2, py, 3 + rp*12, (3 + rp*12)*0.25, 0, 0, 7); ctx.stroke();
-    }
+}
+const PUDDLES = [[150, 412, 44], [700, 424, 56], [880, 356, 30], [300, 350, 24]];
+function paintPuddles(){
+  for (const [px, py, pr] of PUDDLES) {
+    ctx.fillStyle = 'rgba(110,140,165,.42)'; ctx.beginPath(); ctx.ellipse(px, py, pr, pr*0.22, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.beginPath(); ctx.ellipse(px - pr*0.3, py - 2, pr*0.35, pr*0.05, 0, 0, 7); ctx.fill();
   }
+}
+
+// One backdrop is kept at a time. It's repainted when the location, weather, canvas size or time of day changes.
+let backdrop = null, backdropKey = '';
+function getBackdrop(id){
+  const wm = warmth(), key = [id, curWeather(), Math.round(wm*24), sceneScale].join();
+  if (key === backdropKey) return backdrop;
+  backdropKey = key;
+  backdrop = backdrop || document.createElement('canvas');
+  backdrop.width = Math.ceil(W*sceneScale); backdrop.height = Math.ceil(H*sceneScale);
+  const screen = ctx;
+  ctx = backdrop.getContext('2d'); // the drawing helpers all paint to ctx
+  ctx.setTransform(sceneScale, 0, 0, sceneScale, 0, 0);
+  paintGround(id);
+  for (const it of getScenery(id)) PAINT[it.k](it, wm);
+  if (id === 'downtown') paintRoad();
+  paintWalkway(id);
+  if (isWet()) paintPuddles();
+  ctx = screen;
+  return backdrop;
+}
+
+// ---------- the parts of the scenery that move ----------
+function drawSea(t){
+  const sg = ctx.createLinearGradient(0, 195, 0, 252); sg.addColorStop(0, mix('#2A86BD', '#C77B5A', warmth()*0.35)); sg.addColorStop(1, '#6CC7E8');
+  ctx.fillStyle = sg; ctx.fillRect(0, 195, W, 60);
+  drawFar('beach');
+  ctx.strokeStyle = 'rgba(255,255,255,.65)'; ctx.lineWidth = 2;
+  for (let i = 0; i < 14; i++) { const wx = (i*83 + t*0.02) % (W+60) - 30; ctx.beginPath(); ctx.arc(wx, 226 + (i%3)*8, 9, Math.PI, 0); ctx.stroke(); }
+  // sailboat
+  const bx = amb.boat.x - 40, by = 210 + Math.sin(t/600)*1.5;
+  ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx, by-30); ctx.lineTo(bx+20, by); ctx.fill();
+  ctx.fillStyle = '#E8574A'; ctx.beginPath(); ctx.moveTo(bx-2, by-24); ctx.lineTo(bx-2, by); ctx.lineTo(bx-14, by); ctx.fill();
+  ctx.fillStyle = '#6B4A30'; ctx.beginPath(); ctx.moveTo(bx-16, by+1); ctx.lineTo(bx+22, by+1); ctx.lineTo(bx+16, by+7); ctx.lineTo(bx-12, by+7); ctx.fill();
+  // gulls
+  ctx.strokeStyle = '#3A4650'; ctx.lineWidth = 2;
+  for (const g of amb.gulls) {
+    const f = Math.sin(g.ph)*4, gx = g.x - 20;
+    ctx.beginPath(); ctx.moveTo(gx-8, g.y - f); ctx.quadraticCurveTo(gx-4, g.y-4, gx, g.y); ctx.quadraticCurveTo(gx+4, g.y-4, gx+8, g.y - f); ctx.stroke();
+  }
+}
+function drawDucks(pond){
+  for (const d of amb.ducks) {
+    const dx = pond.x + Math.cos(d.a)*pond.w*0.32, dy = 273 + Math.sin(d.a)*6, dir = -Math.sin(d.a) >= 0 ? 1 : -1;
+    circ(dx, dy, 5, '#FFFFFF'); circ(dx + dir*5, dy-5, 3.2, '#FFFFFF');
+    ctx.fillStyle = '#F0A030'; ctx.fillRect(dir > 0 ? dx+7 : dx-10, dy-6, 3, 2);
+  }
+}
+function drawPalmCrown(palm, t){
+  const x = palm.x, s = palm.s, base = 262, sway = Math.sin(t/900 + x)*0.06;
+  for (let k = 0; k < 6; k++) {
+    const ang = -Math.PI/2 + (k-2.5)*0.62 + sway;
+    ctx.fillStyle = k % 2 ? '#2E9A4E' : '#23803F';
+    ctx.beginPath(); ctx.ellipse(x+4*s + Math.cos(ang)*27*s, base-95*s + Math.sin(ang)*14*s + 9*s, 31*s, 7*s, ang, 0, 7); ctx.fill();
+  }
+  circ(x+1*s, base-90*s, 4*s, '#6B4A2A'); circ(x+8*s, base-89*s, 4*s, '#5A3C22');
+}
+function drawCars(){
+  const wm = warmth();
+  for (const c of amb.cars) {
+    const cy = c.dir > 0 ? 286 : 272;
+    shadowAt(c.x, cy + 1, 24, 3, .25);
+    ctx.fillStyle = c.c; rr(c.x-24, cy-12, 48, 11, 4); ctx.fill(); rr(c.x-13, cy-20, 26, 10, 4); ctx.fill();
+    ctx.fillStyle = '#CDE8F5'; ctx.fillRect(c.x-10, cy-18, 9, 6); ctx.fillRect(c.x+1, cy-18, 9, 6);
+    circ(c.x-14, cy-1, 4, '#2A2E33'); circ(c.x+14, cy-1, 4, '#2A2E33');
+    circ(c.x + c.dir*23, cy-8, 2, wm > .3 ? '#FFF1B0' : '#F7F3E0');
+  }
+}
+function drawRipples(t){
+  ctx.lineWidth = 1;
+  for (const [px, py, pr] of PUDDLES) {
+    const rp = ((t/700 + px) % 1);
+    ctx.strokeStyle = `rgba(230,240,250,${0.5*(1-rp)})`;
+    ctx.beginPath(); ctx.ellipse(px + pr*0.2, py, 3 + rp*12, (3 + rp*12)*0.25, 0, 0, 7); ctx.stroke();
+  }
+}
+function drawBackground(id, t){
+  drawSky(t);
+  if (id === 'beach') drawSea(t);
+  const layer = getBackdrop(id);
+  ctx.drawImage(layer, 0, 0, layer.width / sceneScale, layer.height / sceneScale);
+  for (const it of getScenery(id)) {
+    if (it.k === 'pond') drawDucks(it);
+    else if (it.k === 'palm') drawPalmCrown(it, t);
+  }
+  if (id === 'downtown') drawCars();
+  if (isWet()) drawRipples(t);
 }
 
 function drawStand(t){
@@ -415,15 +467,18 @@ function drawWalker(w, t){
   }
 }
 
-function saleFx(price){
+export function saleFx(price){
   amb.fx.push({ k:'txt', x:STAND_X + 44, y:190, vy:-38, life:1.3, txt:'+' + money(price) });
   if (reducedMotion()) return;
   for (let i = 0; i < 6; i++) amb.fx.push({ k:'sp', x:STAND_X + 28 + (Math.random()-0.5)*30, y:205, vx:(Math.random()-0.5)*80, vy:-40 - Math.random()*60, life:0.7 + Math.random()*0.4 });
 }
-function drawFx(dt){
+function updateFx(dt){
   const sp = sim ? Math.max(1, sim.speed*0.7) : 1;
+  for (const f of amb.fx) { f.life -= dt * sp; f.x += (f.vx || 0) * dt * sp; f.y += f.vy * dt * sp; if (f.k === 'sp') f.vy += 120 * dt * sp; }
+  amb.fx = amb.fx.filter(f => f.life > 0);
+}
+function drawFx(){
   for (const f of amb.fx) {
-    f.life -= dt * sp; f.x += (f.vx || 0) * dt * sp; f.y += f.vy * dt * sp; if (f.k === 'sp') f.vy += 120 * dt * sp;
     ctx.globalAlpha = clamp(f.life, 0, 1);
     if (f.k === 'txt') {
       ctx.font = '800 18px "Baloo 2", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -435,12 +490,42 @@ function drawFx(dt){
     }
   }
   ctx.globalAlpha = 1;
-  amb.fx = amb.fx.filter(f => f.life > 0);
 }
 
 const drops = Array.from({length:130}, () => ({ x:Math.random()*W, y:Math.random()*H, v:0.6 + Math.random()*0.6 }));
 let flash = 0;
-function drawWeatherFx(t, dt){
+const rainDrops = () => curWeather() === 'storm' ? 130 : 75;
+const vignette = ctx.createRadialGradient(W/2, H/2, H*0.45, W/2, H/2, W*0.62);
+vignette.addColorStop(0, 'rgba(0,0,0,0)'); vignette.addColorStop(1, 'rgba(0,0,0,.16)');
+
+function updateAmbient(dt, t){
+  const id = S.loc, wt = curWeather();
+  if (id === 'beach') {
+    amb.boat.x = (amb.boat.x + dt*9) % (W + 80);
+    for (const g of amb.gulls) { g.x = (g.x + g.v*dt) % (W + 40); g.ph += dt*6; }
+  } else if (id === 'park') {
+    for (const d of amb.ducks) d.a += dt*0.18;
+  } else if (id === 'downtown') {
+    for (const c of amb.cars) { c.x += c.dir * c.v * dt; if (c.x > W + 60) c.x = -60; if (c.x < -60) c.x = W + 60; }
+  }
+  if (isWet()) {
+    for (let i = 0, n = rainDrops(); i < n; i++) {
+      const d = drops[i];
+      d.y += d.v*dt*620; d.x -= dt*(wt === 'storm' ? 160 : 80);
+      if (d.y > H) { d.y = -10; d.x = Math.random()*(W+120); }
+      if (d.x < -10) d.x += W + 20;
+    }
+  }
+  if (wt === 'storm') {
+    for (const l of amb.leaves) {
+      l.x -= l.v * dt * 230; l.y += Math.sin(t/300 + l.r) * dt * 40; l.r += dt * 4;
+      if (l.x < -10) { l.x = W + 10; l.y = 100 + Math.random()*300; }
+    }
+    if (flash > 0) flash -= dt*2;
+    if (Math.random() < dt*0.25) flash = 0.5;
+  }
+}
+function drawWeatherFx(t){
   const wt = curWeather();
   if (wt === 'hot') {
     ctx.strokeStyle = 'rgba(255,255,255,.09)'; ctx.lineWidth = 2;
@@ -453,19 +538,16 @@ function drawWeatherFx(t, dt){
   }
   if (isWet()) {
     ctx.strokeStyle = 'rgba(210,230,245,.55)'; ctx.lineWidth = 1.5; ctx.beginPath();
-    const n = wt === 'storm' ? 130 : 75, slant = wt === 'storm' ? 6 : 3;
-    for (let i = 0; i < n; i++) { const d = drops[i]; d.y += d.v*dt*620; d.x -= dt*(wt === 'storm' ? 160 : 80); if (d.y > H) { d.y = -10; d.x = Math.random()*(W+120); } if (d.x < -10) d.x += W + 20; ctx.moveTo(d.x, d.y); ctx.lineTo(d.x - slant, d.y + 13); }
+    const n = rainDrops(), slant = wt === 'storm' ? 6 : 3;
+    for (let i = 0; i < n; i++) { const d = drops[i]; ctx.moveTo(d.x, d.y); ctx.lineTo(d.x - slant, d.y + 13); }
     ctx.stroke();
   }
   if (wt === 'storm') {
     for (const l of amb.leaves) {
-      l.x -= l.v * dt * 230; l.y += Math.sin(t/300 + l.r) * dt * 40; l.r += dt * 4;
-      if (l.x < -10) { l.x = W + 10; l.y = 100 + Math.random()*300; }
       ctx.save(); ctx.translate(l.x, l.y); ctx.rotate(l.r); ctx.fillStyle = l.v > 1.3 ? '#B98A3E' : '#6FA84A';
       ctx.beginPath(); ctx.ellipse(0, 0, 5, 2.5, 0, 0, 7); ctx.fill(); ctx.restore();
     }
-    if (Math.random() < dt*0.25) flash = 0.5;
-    if (flash > 0 && dt) { ctx.fillStyle = `rgba(255,255,255,${flash})`; ctx.fillRect(0, 0, W, H); flash -= dt*2; }
+    if (flash > 0) { ctx.fillStyle = `rgba(255,255,255,${flash})`; ctx.fillRect(0, 0, W, H); }
   }
   const wm = warmth();
   if (wm > 0) {
@@ -473,20 +555,24 @@ function drawWeatherFx(t, dt){
     g.addColorStop(0, `rgba(255,150,70,${wm*0.16})`); g.addColorStop(1, `rgba(120,60,90,${wm*0.12})`);
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   }
-  const v = ctx.createRadialGradient(W/2, H/2, H*0.45, W/2, H/2, W*0.62);
-  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.16)');
-  ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = vignette; ctx.fillRect(0, 0, W, H);
 }
 
-function draw(ts, realDt){
-  // Reduce motion holds the scenery and weather still and drops the lightning.
-  // Customers still walk (the day needs them) and sale effects still expire.
-  const still = reducedMotion(), t = still ? 0 : ts, dt = still ? 0 : realDt;
-  ctx.clearRect(0, 0, W, H);
-  drawBackground(S.loc, t, dt);
+function draw(t){
+  drawBackground(S.loc, t);
   drawStand(t);
   const ws = sim ? [...sim.walkers].sort((a,b) => a.y - b.y) : [];
   for (const w of ws) drawWalker(w, t);
-  drawFx(realDt);
-  drawWeatherFx(t, dt);
+  drawFx();
+  drawWeatherFx(t);
+}
+
+// Runs once a frame. A paused day stops everything. Reduce motion holds the scenery and weather still
+// and drops the lightning, while customers still walk (the day needs them) and sale effects still expire.
+let sceneT = 0;
+export function renderFrame(dt, paused){
+  if (paused || reducedMotion()) flash = 0;
+  else { sceneT += dt*1000; updateAmbient(dt, sceneT); }
+  if (!paused) updateFx(dt);
+  draw(sceneT);
 }
