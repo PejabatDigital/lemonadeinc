@@ -6,7 +6,6 @@
 
 // ---------- icons (24px line set, same as Figma "Icon/*") ----------
 const ICONS = {
-  menu:'<path d="M4 7h16M4 12h16M4 17h16"/>',
   close:'<path d="M6 6l12 12M18 6L6 18"/>',
   chevron:'<path d="M9 5l7 7-7 7"/>',
   play:'<path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/>',
@@ -26,7 +25,7 @@ const icon = (name, cls = 'icon') => `<svg class="${cls}" viewBox="0 0 24 24" fi
 const PREFS_KEY = 'lemonade-inc-settings-v1';
 const prefs = Object.assign({ sound:true, theme:'auto', motion:'auto' }, (() => { try { return JSON.parse(localStorage.getItem(PREFS_KEY)) || {}; } catch(e){ return {}; } })());
 const savePrefs = () => { try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch(e){} };
-const sysReduce = window.matchMedia ? matchMedia('(prefers-reduced-motion: reduce)') : { matches:false };
+const sysReduce = matchMedia('(prefers-reduced-motion: reduce)');
 const reducedMotion = () => prefs.motion === 'reduce' || (prefs.motion === 'auto' && sysReduce.matches);
 function applyPrefs(){
   const r = document.documentElement;
@@ -136,14 +135,13 @@ function hideMenu(instant){
 
 // ---------- how to play: 4 cards ----------
 const HOWTO = [
-  ['🛒', 'Stock up each morning', 'Check the forecast, then buy lemons, sugar, ice and cups. Lemons go bad after 4 days and ice melts overnight, so don’t overbuy.'],
+  ['🛒', 'Stock up each morning', 'Check the forecast, then buy lemons, sugar, ice and cups. Lemons go bad after ' + LEMON_LIFE + ' days and ice melts overnight, so don’t overbuy.'],
   ['🍋', 'Mix your recipe and price', 'Balance lemons, sugar and ice. Customers tell you what they think in speech bubbles. The Price tab shows your cost and margin per cup.'],
   ['☀️', 'Open the stand', 'Watch the day play out from 9am to 6pm. Speed it up with 2× or 4×, or close early if you sell out.'],
   ['📈', 'Grow the business', 'Happy customers raise popularity, which brings more buyers and unlocks busier spots. Buy upgrades in the Shop and track it all in Books.'],
 ];
 let howStep = 0;
 function showHelp(step = 0){
-  hideMenu(true);
   howStep = clamp(step, 0, HOWTO.length - 1);
   const [art, h, body] = HOWTO[howStep], last = howStep === HOWTO.length - 1;
   showModal(`${popupHead('How to play', `Run Lemonade Inc. for a ${SEASON}-day season and make as much money as you can.`)}
@@ -161,7 +159,6 @@ function finishHelp(){ S.seenHelp = true; save(); hideModal(); }
 // ---------- settings ----------
 const cap = s => s[0].toUpperCase() + s.slice(1);
 function showSettings(){
-  hideMenu(true);
   showModal(`${popupHead('Settings', 'Saved automatically on this device.')}
     <div class="set-row"><div><b id="lblSound">Sound effects</b><small>Cha-ching on every sale.</small></div>
       <button class="toggle" role="switch" aria-checked="${prefs.sound}" aria-labelledby="lblSound" data-act="set:sound"></button></div>
@@ -169,7 +166,7 @@ function showSettings(){
       <div class="seg" role="group" aria-labelledby="lblTheme">${['auto', 'light', 'dark'].map(t => `<button aria-pressed="${prefs.theme === t}" data-act="set:theme:${t}">${cap(t)}</button>`).join('')}</div></div>
     <div class="set-row"><div><b id="lblMotion">Reduce motion</b><small>Fewer animations. Follows your device until you change it.</small></div>
       <button class="toggle" role="switch" aria-checked="${reducedMotion()}" aria-labelledby="lblMotion" data-act="set:motion"></button></div>
-    ${hasProgress() ? `<div style="margin-top:8px">${menuItem('reset', 'Start a new season', 'newgame', null, { danger:true })}</div>` : ''}
+    ${hasProgress() ? `<div class="mt-2">${menuItem('reset', 'Start a new season', 'newgame', null, { danger:true })}</div>` : ''}
     <p class="fine">Lemonade Inc. v${VERSION}</p>`);
 }
 function setPref(key, val, btn){
@@ -189,8 +186,7 @@ function confirmNewSeason(){
     : card.querySelector('[data-act^="set:"]') ? showSettings
     : (report && report.season && card.querySelector('[data-act="next"]')) ? openReport
     : card.querySelector('.tally') && S.seasonDone ? showSeason : null;
-  hideMenu(true);
-  const sub = S.seasonDone ? `Your season finished with ${money(S.total)} profit.` : `You’re on day ${S.day} with ${money(S.cash)} in the till.`;
+  const sub = S.seasonDone ? `Your season finished with ${money(seasonTotals().net)} profit.` : `You’re on day ${S.day} with ${money(S.cash)} in the till.`;
   showModal(`${popupHead('Start a new season?', sub, false)}
     <p class="callout callout--warn">This wipes your current season, upgrades and books. It can’t be undone.</p>
     <div class="btn-stack"><button class="btn btn--danger btn--lg btn--block" data-act="ns:yes">Yes, start over</button>
@@ -248,4 +244,3 @@ document.addEventListener('keydown', e => {
     if (Math.abs(dx) > 50) { const n = howStep + (dx < 0 ? 1 : -1); if (n >= 0 && n < HOWTO.length) showHelp(n); }
   }, { passive:true });
 }
-sysReduce.addEventListener && sysReduce.addEventListener('change', () => applyPrefs());

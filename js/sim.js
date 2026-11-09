@@ -21,9 +21,9 @@ function openStand(){
   renderAll();
 }
 function fb(k){ sim.stats.fb[k] = (sim.stats.fb[k] || 0) + 1; }
-function say(w, k, txt){
+function say(w, k){
   if ((k === 'line' || k === 'pricey' || k === 'ok') && sim && sim.walkers.filter(x => x.bubble).length >= 4) return;
-  w.bubble = txt || FB[k]; w.bt = 2.6;
+  w.bubble = FB[k]; w.bt = 2.6;
 }
 
 function spawnWalker(){
@@ -36,7 +36,7 @@ function spawnWalker(){
 }
 function decide(w){
   w.decided = true; sim.stats.seen++;
-  const umbrella = S.upg.parasol && (sim.temp >= 30 || sim.weather === 'rain' || sim.weather === 'storm') ? 1.2 : 1;
+  const umbrella = S.upg.parasol && (sim.temp >= 30 || WEATHER[sim.weather].wet) ? 1.2 : 1;
   const interest = clamp(sim.tf * (0.55 + S.pop/200) * WEATHER[sim.weather].want * umbrella, 0.05, 0.95);
   if (Math.random() > interest) return;
   if (sim.soldOut) { say(w,'soldout'); fb('soldout'); sim.popDelta -= 0.15; return; }
@@ -130,15 +130,14 @@ function endDay(){
     S.ice = kept;
   }
   S.lemons.forEach(b => b.age++);
-  const spoiled = sum(S.lemons.filter(b => b.age >= 4), b => b.n);
+  const spoiled = sum(S.lemons.filter(b => b.age >= LEMON_LIFE), b => b.n);
   const wLemons = spoiled * S.cost.lemons;
-  S.lemons = S.lemons.filter(b => b.age < 4);
+  S.lemons = S.lemons.filter(b => b.age < LEMON_LIFE);
   if (spoiled) notes.push(`${spoiled} lemons went bad.`);
   const waste = wPitcher + wIce + wLemons;
   const net = st.revenue - sim.cogs - waste - sim.rent;
-  S.total += net;
   const row = { day:S.day, weather:sim.weather, temp:sim.temp, loc:S.loc, seen:st.seen, sold:st.sold,
-    sales:st.revenue, cogs:sim.cogs, wLemons, wIce, wPitcher, waste, rent:sim.rent, capex:S.capex || 0,
+    sales:st.revenue, cogs:sim.cogs, wLemons, wIce, wPitcher, waste, rent:sim.rent, capex:S.capex,
     bought:S.spend, net, cash:S.cash, stock:stockValue(), pop:S.pop, price:S.recipe.price };
   S.ledger.push(row);
   const top = Object.entries(st.fb).filter(([k]) => k !== 'yum' && k !== 'ok').sort((a,b) => b[1]-a[1])[0];

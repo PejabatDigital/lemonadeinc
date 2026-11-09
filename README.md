@@ -2,12 +2,12 @@
 
 A browser lemonade-stand management game. Buy supplies each morning, set your recipe and price, watch the weather, and grow the business over a 30-day season. Plays on desktop and iPad, with no install and no build step.
 
-Live: https://lemonadeinc.netlify.app
+Live: https://lemonadeinc.kasahkod.cc
 
 ## Project structure
 
 ```
-index.html              Page layout; loads the CSS and scripts in order
+index.html              Page layout; loads the CSS and scripts
 css/style.css           All styling. Tokens at the top match the Figma design system
 js/config.js            Tunable game data: locations, weather, shop packs, upgrades, feedback text, helpers
 js/state.js             Game state, save/load, stock value and cost-per-cup maths
@@ -20,7 +20,6 @@ assets/                 Title-screen art as WebP: logo, plus portrait, 5:4 and 1
 sw.js                   Service worker (offline play, network-first so updates show immediately)
 manifest.webmanifest    Home Screen app settings
 icons/                  App icons
-netlify.toml            Netlify settings
 ```
 
 The scripts are plain (non-module) JavaScript loaded in order, so they share one global scope. Keep the load order in `index.html` as it is.
@@ -37,7 +36,7 @@ Then open http://localhost:8000
 
 ## Deploy
 
-Netlify is linked to this repo. Every push to `main` goes live automatically. Push other branches to get a preview link to test on the iPad before merging.
+The code is on [GitHub](https://github.com/PejabatDigital/lemonadeinc) and the live site is hosted on Cloudflare at https://lemonadeinc.kasahkod.cc. It's a static site with no build step, served from the repo root.
 
 ## Design system
 
@@ -47,8 +46,8 @@ Use the shared components instead of one-off styles: `.btn` (`--primary`, `--sec
 
 ## Things to know
 
-- **Saves** live in each browser's local storage, under the key `sunny-squeeze-save-v1` in `js/config.js`. Don't rename it, and keep the same domain, or existing saves won't load. The old name is kept on purpose so earlier saves carry over.
-- **Offline cache:** if you add or rename files, add them to `ASSETS` in `sw.js` and bump `CACHE` (e.g. `lemonade-inc-v2`).
+- **Saves** live in each browser's local storage for the site's domain, under the key `sunny-squeeze-save-v1` in `js/config.js`. Changing the key or the domain strands existing saves, which is why the key still has the game's old name.
+- **Offline cache:** if you add or rename files, add them to `ASSETS` in `sw.js` and bump the version in `CACHE`.
 - **Balancing:** prices, traffic, rent and upgrade costs are all in `js/config.js`. Taste and buying behaviour are in `js/sim.js` (`decide` and `taste`).
 - **Settings** (sound, theme, reduce motion) are saved separately under `lemonade-inc-settings-v1`, so starting a new season keeps them.
 - **Pausing:** the trading day stops while the menu, a popup or the title screen is open (`isPaused()` in `shell.js`).

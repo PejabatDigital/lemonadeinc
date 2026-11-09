@@ -1,6 +1,6 @@
 /* Lemonade Inc. | sw.js
    Offline support. Network-first: when online you always get the latest version
-   from Netlify; when offline the last copy you played is served from the cache.
+   from the server; when offline the last copy you played is served from the cache.
    Bump CACHE when you add or rename files so old caches get cleared. */
 const CACHE = 'lemonade-inc-v4';
 const ASSETS = [

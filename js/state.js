@@ -8,7 +8,7 @@ let supplyItem = 'lemons';
 
 function genForecast(){
   let r = Math.random(), i = 0;
-  while (i < WWEIGHT.length - 1 && r > WWEIGHT[i]) { r -= WWEIGHT[i]; i++; }
+  while (i < WORDER.length - 1 && r > WEATHER[WORDER[i]].weight) { r -= WEATHER[WORDER[i]].weight; i++; }
   const type = WORDER[i], [a,b] = WEATHER[type].t, temp = rint(a,b);
   return { type, temp, actual:rollActual(type, temp) };
 }
@@ -22,7 +22,7 @@ function rollActual(type, temp){
 function newState(){
   return { v:1, day:1, cash:20, pop:10, lemons:[], sugar:0, ice:0, cups:0,
     recipe:{ l:4, s:4, i:3, price:0.40 }, loc:'lane', upg:{}, forecast:genForecast(),
-    spend:0, total:0, seasonDone:false, seenHelp:false,
+    spend:0, seasonDone:false, seenHelp:false,
     cost:Object.fromEntries(Object.keys(SHOP).map(k => [k, refCost(k)])), ledger:[], upgLog:{}, capex:0 };
 }
 // Only save between days: a mid-day save would store rent and sales without the day's ledger row.
@@ -49,6 +49,12 @@ function cupCost(){
   return c;
 }
 const stockValue = () => sum(Object.keys(SHOP), k => haveOf(k) * S.cost[k]);
+function seasonTotals(){
+  const fields = ['sold','sales','cogs','waste','wLemons','wIce','wPitcher','rent','net'];
+  const t = Object.fromEntries(fields.map(k => [k, sum(S.ledger, r => r[k])]));
+  t.avgMargin = t.sold ? (t.sales - t.cogs) / t.sold : 0;
+  return t;
+}
 function normalize(d){
   d.cost = d.cost || {};
   for (const k in SHOP) if (d.cost[k] == null) d.cost[k] = refCost(k);

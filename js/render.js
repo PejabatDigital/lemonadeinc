@@ -25,7 +25,7 @@ const shade = (h, a) => mix(h, a < 0 ? '#000000' : '#ffffff', Math.abs(a));
 const dayP = () => sim ? sim.min / DAY_MIN : 0.06;
 const warmth = () => clamp((dayP() - 0.6) / 0.4, 0, 1);
 const curWeather = () => sim ? sim.weather : S.forecast.type;
-const isWet = () => { const w = curWeather(); return w === 'rain' || w === 'storm'; };
+const isWet = () => WEATHER[curWeather()].wet;
 function shadowAt(x, y, rx, ry, a = 0.22){ ctx.fillStyle = `rgba(25,35,30,${a})`; ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, 7); ctx.fill(); }
 function circ(x, y, r, c){ ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
 
@@ -444,7 +444,7 @@ function drawWeatherFx(t, dt){
       ctx.stroke();
     }
   }
-  if (wt === 'rain' || wt === 'storm') {
+  if (isWet()) {
     ctx.strokeStyle = 'rgba(210,230,245,.55)'; ctx.lineWidth = 1.5; ctx.beginPath();
     const n = wt === 'storm' ? 130 : 75, slant = wt === 'storm' ? 6 : 3;
     for (let i = 0; i < n; i++) { const d = drops[i]; d.y += d.v*dt*620; d.x -= dt*(wt === 'storm' ? 160 : 80); if (d.y > H) { d.y = -10; d.x = Math.random()*(W+120); } if (d.x < -10) d.x += W + 20; ctx.moveTo(d.x, d.y); ctx.lineTo(d.x - slant, d.y + 13); }
@@ -477,11 +477,9 @@ function draw(ts, realDt){
   const still = reducedMotion(), t = still ? 0 : ts, dt = still ? 0 : realDt;
   ctx.clearRect(0, 0, W, H);
   drawBackground(S.loc, t, dt);
-  const ws = sim ? sim.walkers : [];
-  for (const w of ws) if (w.y < 300) drawWalker(w, t);
   drawStand(t);
-  const front = ws.filter(w => w.y >= 300).sort((a,b) => a.y - b.y);
-  for (const w of front) drawWalker(w, t);
+  const ws = sim ? [...sim.walkers].sort((a,b) => a.y - b.y) : [];
+  for (const w of ws) drawWalker(w, t);
   drawFx(realDt);
   drawWeatherFx(t, dt);
 }

@@ -9,7 +9,7 @@ const isMobile = () => mobileMQ.matches;
 mobileMQ.addEventListener('change', () => renderBoard());
 
 function supplyRow(k){
-  const it = SHOP[k], expiring = sum(S.lemons.filter(b => b.age === 3), b => b.n);
+  const it = SHOP[k], expiring = sum(S.lemons.filter(b => b.age === LEMON_LIFE - 1), b => b.n);
   const extra = k === 'lemons' && expiring ? ` <span class="warn">${expiring} go bad tonight.</span>` : '';
   return `<div class="row"><div><h3><span class="sup-ico">${it.icon}</span>${it.name}: ${haveOf(k)}</h3><p>${it.note}${extra}</p></div>
     <div class="packs">${it.packs.map(([n,p],i) => `<button class="pack" data-act="buy:${k}:${i}" ${S.cash < p ? 'disabled' : ''}>Buy ${n}<small>${money(p)}</small></button>`).join('')}</div></div>`;
@@ -26,13 +26,12 @@ const TAB_INFO = {
   books:    'Track your daily sales and season-long performance.',
 };
 
-const LOC_ICON = { lane:'🏡', park:'🌳', downtown:'🏙️', beach:'🏖️' };
 function locationRow(l){
   const locked = S.pop < l.need, here = S.loc === l.id;
   const action = here ? `<span class="status status--done">${icon('pin')}You're here</span>`
     : locked ? `<span class="status">${icon('lock')}Needs ${l.need}%</span>`
     : `<button class="btn btn--secondary" data-act="loc:${l.id}">Move here</button>`;
-  return `<div class="list-row${locked ? ' is-locked' : ''}${here ? ' is-here' : ''}"><div class="tile" aria-hidden="true">${LOC_ICON[l.id] || '📍'}</div><div class="txt"><h3>${l.name}</h3><p>${l.desc} Rent ${l.rent ? money(l.rent) + ' a day' : 'free'}.</p></div>${action}</div>`;
+  return `<div class="list-row${locked ? ' is-locked' : ''}${here ? ' is-here' : ''}"><div class="tile" aria-hidden="true">${l.icon}</div><div class="txt"><h3>${l.name}</h3><p>${l.desc} Rent ${l.rent ? money(l.rent) + ' a day' : 'free'}.</p></div>${action}</div>`;
 }
 
 function renderStats(){
@@ -60,14 +59,14 @@ function paintBoard(){
   $('#openBar').classList.toggle('on', !sim);
   if (sim) {
     const st = sim.stats;
-    el.innerHTML = `<div class="live">
+    el.innerHTML = `<div class="tiles tiles--live">
       <div><b>${st.sold}</b><span>cups sold</span></div>
       <div><b class="${st.revenue - sim.cogs - sim.rent >= 0 ? 'good' : 'badc'}">${money(st.revenue - sim.cogs - sim.rent)}</b><span>profit so far (before waste)</span></div>
       <div><b>${money(st.revenue)}</b><span>taken today</span></div>
       <div><b>${sim.queue.length}</b><span>in line</span></div>
       <div><b>${lemonCount()} / ${S.sugar}</b><span>lemons / sugar left</span></div>
       <div><b>${S.ice} / ${S.cups}</b><span>ice / cups left</span></div>
-      </div>${sim.soldOut ? `<p class="warn" style="margin:12px 0 0;font-weight:800">Out of ${sim.soldOut}! Customers are being turned away. Close early to restock tomorrow.</p>` : ''}`;
+      </div>${sim.soldOut ? `<p class="warn warn--line">Out of ${sim.soldOut}! Customers are being turned away. Close early to restock tomorrow.</p>` : ''}`;
     return;
   }
   const tabs = [['supplies','Supplies'],['recipe','Recipe'],['price','Price'],['books','Books']];
@@ -76,8 +75,8 @@ function paintBoard(){
   let body = '';
   if (tab === 'supplies') {
     if (isMobile()) {
-      const chips = Object.entries(SHOP).map(([k,it]) => `<button class="chip" data-act="sel:sup:${k}" aria-pressed="${supplyItem===k}" aria-label="${it.name}">${it.icon}</button>`).join('');
-      body = `<div class="chips">${chips}</div>` + supplyRow(SHOP[supplyItem] ? supplyItem : 'lemons');
+      const chips = Object.entries(SHOP).map(([k,it]) => `<button class="chip" data-act="sel:${k}" aria-pressed="${supplyItem===k}" aria-label="${it.name}">${it.icon}</button>`).join('');
+      body = `<div class="chips">${chips}</div>` + supplyRow(supplyItem);
     } else {
       body = Object.keys(SHOP).map(supplyRow).join('');
     }
@@ -117,19 +116,21 @@ function pricePanel(){
   </dl></div>`;
 }
 
-const svgWrap = (w, h, g) => `<svg viewBox="0 0 ${w} ${h}" font-size="13" fill="#B9C8BC" font-family="Nunito, system-ui, sans-serif" role="img">${g}</svg>`;
+const svgWrap = (w, h, g) => `<svg viewBox="0 0 ${w} ${h}" role="img">${g}</svg>`;
+const axisLine = (x1, x2, y) => `<line class="axis" x1="${x1}" x2="${x2}" y1="${y}" y2="${y}"/>`;
+const yLabel = (pl, y, txt) => `<text x="${pl-6}" y="${y+4}" text-anchor="end">${txt}</text>`;
+const xLabel = (x, h, txt) => `<text x="${x.toFixed(1)}" y="${h-6}" text-anchor="middle">${txt}</text>`;
 function svgBars(vals, labels, fmt){
   const w = 600, h = 180, pl = 52, pr = 8, pt = 12, pb = 24, n = vals.length;
   const top = Math.max(0, ...vals), bot = Math.min(0, ...vals), range = (top - bot) || 1;
   const y = v => pt + (top - v) / range * (h - pt - pb), bw = (w - pl - pr) / n, every = Math.ceil(n / 10);
-  let g = `<line x1="${pl}" x2="${w-pr}" y1="${y(0)}" y2="${y(0)}" stroke="#B9C8BC" stroke-opacity=".5"/>`;
-  g += `<text x="${pl-6}" y="${y(top)+4}" text-anchor="end">${fmt(top)}</text>`;
-  if (bot < 0) g += `<text x="${pl-6}" y="${y(bot)+4}" text-anchor="end">${fmt(bot)}</text>`;
-  if (top !== 0 && bot !== 0) g += `<text x="${pl-6}" y="${y(0)+4}" text-anchor="end">${fmt(0)}</text>`;
+  let g = axisLine(pl, w-pr, y(0)) + yLabel(pl, y(top), fmt(top));
+  if (bot < 0) g += yLabel(pl, y(bot), fmt(bot));
+  if (top !== 0 && bot !== 0) g += yLabel(pl, y(0), fmt(0));
   vals.forEach((v, i) => {
     const x = pl + i*bw + bw*0.15, y0 = y(Math.max(v, 0)), hh = Math.max(1, Math.abs(y(v) - y(0)));
-    g += `<rect x="${x.toFixed(1)}" y="${y0.toFixed(1)}" width="${(bw*0.7).toFixed(1)}" height="${hh.toFixed(1)}" rx="2" fill="${v >= 0 ? '#9BE39A' : '#FFB4A8'}"><title>Day ${labels[i]}: ${fmt(v)}</title></rect>`;
-    if (i % every === 0) g += `<text x="${(pl + i*bw + bw/2).toFixed(1)}" y="${h-6}" text-anchor="middle">${labels[i]}</text>`;
+    g += `<rect class="${v >= 0 ? 'bar-pos' : 'bar-neg'}" x="${x.toFixed(1)}" y="${y0.toFixed(1)}" width="${(bw*0.7).toFixed(1)}" height="${hh.toFixed(1)}" rx="2"><title>Day ${labels[i]}: ${fmt(v)}</title></rect>`;
+    if (i % every === 0) g += xLabel(pl + i*bw + bw/2, h, labels[i]);
   });
   return svgWrap(w, h, g);
 }
@@ -138,12 +139,11 @@ function svgLine(vals, labels, fmt){
   const top = Math.max(...vals), bot = Math.min(0, ...vals), range = (top - bot) || 1;
   const x = i => n === 1 ? (pl + w - pr) / 2 : pl + i * (w - pl - pr) / (n - 1), y = v => pt + (top - v) / range * (h - pt - pb);
   const every = Math.ceil(n / 10);
-  let g = `<line x1="${pl}" x2="${w-pr}" y1="${y(bot)}" y2="${y(bot)}" stroke="#B9C8BC" stroke-opacity=".5"/>`;
-  g += `<text x="${pl-6}" y="${y(top)+4}" text-anchor="end">${fmt(top)}</text><text x="${pl-6}" y="${y(bot)+4}" text-anchor="end">${fmt(bot)}</text>`;
-  g += `<polyline fill="none" stroke="#FFD93B" stroke-width="3" stroke-linejoin="round" points="${vals.map((v,i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')}"/>`;
+  let g = axisLine(pl, w-pr, y(bot)) + yLabel(pl, y(top), fmt(top)) + yLabel(pl, y(bot), fmt(bot));
+  g += `<polyline class="trend" points="${vals.map((v,i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')}"/>`;
   vals.forEach((v, i) => {
-    g += `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3.5" fill="#FFD93B"><title>Day ${labels[i]}: ${fmt(v)}</title></circle>`;
-    if (i % every === 0) g += `<text x="${x(i).toFixed(1)}" y="${h-6}" text-anchor="middle">${labels[i]}</text>`;
+    g += `<circle class="trend-dot" cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3.5"><title>Day ${labels[i]}: ${fmt(v)}</title></circle>`;
+    if (i % every === 0) g += xLabel(x(i), h, labels[i]);
   });
   return svgWrap(w, h, g);
 }
@@ -152,23 +152,19 @@ function svgScatter(pts){
   const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
   const x0 = Math.min(...xs) - 1, x1 = Math.max(...xs) + 1, y1 = Math.max(10, ...ys);
   const x = v => pl + (v - x0) / (x1 - x0) * (w - pl - pr), y = v => pt + (y1 - v) / y1 * (h - pt - pb);
-  let g = `<line x1="${pl}" x2="${w-pr}" y1="${y(0)}" y2="${y(0)}" stroke="#B9C8BC" stroke-opacity=".5"/>`;
-  g += `<text x="${pl-6}" y="${y(y1)+4}" text-anchor="end">${y1}</text><text x="${pl-6}" y="${y(0)+4}" text-anchor="end">0</text>`;
+  let g = axisLine(pl, w-pr, y(0)) + yLabel(pl, y(y1), y1) + yLabel(pl, y(0), 0);
   g += `<text x="${pl}" y="${h-6}">${Math.round(x0+1)}°C</text><text x="${w-pr}" y="${h-6}" text-anchor="end">${Math.round(x1-1)}°C</text>`;
   pts.forEach(p => { g += `<circle cx="${x(p.x).toFixed(1)}" cy="${y(p.y).toFixed(1)}" r="6" fill="${p.c}" fill-opacity=".85"><title>Day ${p.d}: ${p.y} cups at ${p.x}°C</title></circle>`; });
   return svgWrap(w, h, g);
 }
-const WCOLOR = { hot:'#FFB347', sunny:'#FFD93B', cloudy:'#D5DEE3', rain:'#7FC4F0', storm:'#A99CF0' };
 
 function renderBooks(){
-  const lg = S.ledger, stock = stockValue();
-  const sold = sum(lg, r => r.sold), sales = sum(lg, r => r.sales), cogs = sum(lg, r => r.cogs), waste = sum(lg, r => r.waste);
-  const avgM = sold ? (sales - cogs) / sold : 0;
+  const lg = S.ledger, stock = stockValue(), { sold, waste, net, avgMargin } = seasonTotals();
   const tiles = `<div class="tiles">
     <div><b>${money(S.cash)}</b><span>cash on hand</span></div>
     <div><b>${money(stock)}</b><span>stock value</span></div>
-    <div><b class="${S.total >= 0 ? 'good' : 'badc'}">${money(S.total)}</b><span>season profit</span></div>
-    <div><b>${cents(avgM)}</b><span>average margin per cup</span></div>
+    <div><b class="${net >= 0 ? 'good' : 'badc'}">${money(net)}</b><span>season profit</span></div>
+    <div><b>${cents(avgMargin)}</b><span>average margin per cup</span></div>
     <div><b class="${waste > 0 ? 'badc' : ''}">${money(waste)}</b><span>lost to waste</span></div>
     <div><b>${sold}</b><span>cups sold</span></div></div>`;
   if (!lg.length) return tiles + `<p class="note">Your books fill in after your first day of trading. Open the stand to get started.</p>`;
@@ -176,22 +172,20 @@ function renderBooks(){
   const charts = `<div class="charts">
     <div class="chart"><h4>Net profit per day</h4>${svgBars(lg.map(r => r.net), days, v => money(v))}</div>
     <div class="chart"><h4>Cash at close</h4>${svgLine(lg.map(r => r.cash), days, v => money(v))}</div>
-    <div class="chart"><h4>Cups sold by temperature</h4>${svgScatter(lg.map(r => ({ x:r.temp, y:r.sold, d:r.day, c:WCOLOR[r.weather] })))}</div>
+    <div class="chart"><h4>Cups sold by temperature</h4>${svgScatter(lg.map(r => ({ x:r.temp, y:r.sold, d:r.day, c:WEATHER[r.weather].color })))}</div>
   </div>`;
   const rows = lg.slice().reverse().map(r => `<tr><td>${r.day}</td><td>${WEATHER[r.weather].icon} ${r.temp}°</td><td>${locById(r.loc).name}</td>
     <td>${r.sold}</td><td>${money(r.price)}</td><td>${money(r.sales)}</td><td>−${money(r.cogs)}</td><td>${r.waste ? '−' + money(r.waste) : '–'}</td><td>${r.rent ? '−' + money(r.rent) : '–'}</td>
     <td class="${r.net >= 0 ? 'good' : 'badc'}">${money(r.net)}</td><td>${r.capex ? money(r.capex) : '–'}</td><td>${money(r.cash)}</td></tr>`).join('');
   return tiles + charts + `<div class="books-h"><h3>Daily ledger</h3><button class="pack" data-act="season">Season report</button></div>
     <div class="ledger"><table><thead><tr><th>Day</th><th>Weather</th><th>Spot</th><th>Cups</th><th>Price</th><th>Sales</th><th>Cost of cups</th><th>Waste</th><th>Rent</th><th>Net</th><th>Upgrades</th><th>Cash</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <p class="note" style="margin-top:8px">Net profit is sales minus the cost of what went into sold cups, waste and rent. Stock you buy stays on the books as stock value until it is used, and upgrades are counted as investments.</p>`;
+    <p class="note mt-2">Net profit is sales minus the cost of what went into sold cups, waste and rent. Stock you buy stays on the books as stock value until it is used, and upgrades are counted as investments.</p>`;
 }
 
 function showSeason(){
   const lg = S.ledger; if (!lg.length) return;
-  hideMenu(true);
-  const sold = sum(lg, r => r.sold), sales = sum(lg, r => r.sales), cogs = sum(lg, r => r.cogs);
-  const wL = sum(lg, r => r.wLemons), wI = sum(lg, r => r.wIce), wP = sum(lg, r => r.wPitcher);
-  const rent = sum(lg, r => r.rent), net = sum(lg, r => r.net), capex = sum(Object.values(S.upgLog), u => u.cost);
+  const { sold, sales, cogs, waste, wLemons, wIce, wPitcher, rent, net, avgMargin } = seasonTotals();
+  const capex = sum(Object.values(S.upgLog), u => u.cost);
   const best = lg.reduce((a, r) => r.net > a.net ? r : a), worst = lg.reduce((a, r) => r.net < a.net ? r : a);
   const byLoc = LOCS.map(l => { const rs = lg.filter(r => r.loc === l.id); return { l, n:rs.length, total:sum(rs, r => r.net), cups:sum(rs, r => r.sold) }; }).filter(x => x.n);
   const upg = Object.entries(S.upgLog).map(([id, u]) => {
@@ -203,11 +197,11 @@ function showSeason(){
       <dt>Cups sold</dt><dd>${sold}</dd>
       <dt>Sales</dt><dd>${money(sales)}</dd>
       <dt>Cost of cups sold</dt><dd>−${money(cogs)}</dd>
-      <dt>Average margin per cup</dt><dd>${cents(sold ? (sales - cogs) / sold : 0)}</dd>
-      <dt>Waste</dt><dd>−${money(wL + wI + wP)}</dd>
-      <dt class="indent">Lemons gone bad</dt><dd class="indent">${money(wL)}</dd>
-      <dt class="indent">Melted ice</dt><dd class="indent">${money(wI)}</dd>
-      <dt class="indent">Lemonade poured out</dt><dd class="indent">${money(wP)}</dd>
+      <dt>Average margin per cup</dt><dd>${cents(avgMargin)}</dd>
+      <dt>Waste</dt><dd>−${money(waste)}</dd>
+      <dt class="indent">Lemons gone bad</dt><dd class="indent">${money(wLemons)}</dd>
+      <dt class="indent">Melted ice</dt><dd class="indent">${money(wIce)}</dd>
+      <dt class="indent">Lemonade poured out</dt><dd class="indent">${money(wPitcher)}</dd>
       <dt>Rent paid</dt><dd>${rent ? '−' + money(rent) : money(0)}</dd>
       <dt class="profit">Net profit</dt><dd class="profit ${net >= 0 ? 'pos' : 'neg'}">${money(net)}</dd>
       <dt>Invested in upgrades</dt><dd>${money(capex)}</dd>
@@ -220,8 +214,8 @@ function showSeason(){
     </tbody></table></div>
     <h3>Upgrades</h3>
     ${upg ? `<div class="mini-wrap"><table class="mini"><thead><tr><th>Upgrade</th><th>Bought day</th><th>Cost</th><th>Profit since</th><th>Status</th></tr></thead><tbody>${upg}</tbody></table></div>
-    <p class="sub" style="font-size:14px">An upgrade counts as paid off once your total profit since buying it covers its cost.</p>` : '<p class="sub">No upgrades bought yet.</p>'}
-    <div class="btn-stack"><button class="btn btn--primary btn--lg btn--block" data-act="closemodal">Back to the stand</button>
+    <p class="sub sub--small">An upgrade counts as paid off once your total profit since buying it covers its cost.</p>` : '<p class="sub">No upgrades bought yet.</p>'}
+    <div class="btn-stack"><button class="btn btn--primary btn--lg btn--block" data-act="dismiss">Back to the stand</button>
     ${S.seasonDone && lg.length >= SEASON ? '<button class="btn btn--secondary btn--block" data-act="newgame">Start a new season</button>' : ''}</div>`;
   showModal(html, { wide:true });
 }
@@ -236,7 +230,7 @@ function popupHead(title, sub, close = true){
     ${close ? `<button class="iconbtn" data-act="dismiss" aria-label="Close">${icon('close')}</button>` : ''}</div>`;
 }
 function showModal(html, opts = {}){
-  if (typeof opts === 'boolean') opts = { wide:opts };
+  hideMenu(true);
   const card = $('#card'), wasOpen = $('#modal').classList.contains('on');
   if (!wasOpen) modalReturn = document.activeElement;
   modalDismiss = opts.dismiss === undefined ? () => { hideModal(); renderAll(); } : opts.dismiss;
@@ -244,7 +238,7 @@ function showModal(html, opts = {}){
   card.setAttribute('aria-labelledby', 'dlgTitle');
   $('#modal').classList.add('on'); card.scrollTop = 0;
   card.focus({ preventScroll:true });
-  if (typeof onOverlayChange === 'function') onOverlayChange();
+  onOverlayChange();
 }
 function hideModal(){
   $('#modal').classList.remove('on'); modalDismiss = null;
@@ -255,7 +249,7 @@ function hideModal(){
     if (el && el.focus) el.focus({ preventScroll:true });
   }
   modalReturn = null;
-  if (typeof onOverlayChange === 'function') onOverlayChange();
+  onOverlayChange();
 }
 const modalOpen = () => $('#modal').classList.contains('on');
 function showReport(){ openReport(); countUp($('#netv')); }
@@ -278,13 +272,13 @@ function openReport(){
       <dt>Popularity</dt><dd>${r.pop}% <span class="${r.popChange >= 0 ? 'pos' : 'neg'}">(${r.popChange >= 0 ? '+' : ''}${r.popChange})</span></dd>
       <dt>Cash at close</dt><dd>${money(r.cash)}</dd>
     </dl>
-    ${r.bought > 0 ? `<p class="sub" style="margin:4px 0">You spent ${money(r.bought)} on stock today. Unused stock is worth ${money(r.stock)} and carries over.</p>` : ''}
-    ${r.capex > 0 ? `<p class="sub" style="margin:4px 0">You invested ${money(r.capex)} in upgrades.</p>` : ''}
+    ${r.bought > 0 ? `<p class="sub sub--tight">You spent ${money(r.bought)} on stock today. Unused stock is worth ${money(r.stock)} and carries over.</p>` : ''}
+    ${r.capex > 0 ? `<p class="sub sub--tight">You invested ${money(r.capex)} in upgrades.</p>` : ''}
     ${fbs ? `<ul class="fb">${fbs}</ul>` : '<p class="sub">Nobody stopped by today.</p>'}
     ${r.tip ? `<p class="callout">Tip: ${r.tip}</p>` : ''}
-    ${r.notes.map(n => `<p class="sub" style="margin:4px 0">${n}</p>`).join('')}`;
+    ${r.notes.map(n => `<p class="sub sub--tight">${n}</p>`).join('')}`;
   if (r.season) {
-    html += `<p class="callout">🎉 That's your ${SEASON}-day season! Total profit ${money(S.total)}.</p>
+    html += `<p class="callout">🎉 That's your ${SEASON}-day season! Total profit ${money(seasonTotals().net)}.</p>
       <div class="btn-stack"><button class="btn btn--primary btn--lg btn--block" data-act="season">See season report</button>
       <div class="btn-row"><button class="btn btn--secondary" data-act="next">Keep playing</button><button class="btn btn--secondary" data-act="newgame">New season</button></div></div>`;
   } else html += `<div class="btn-stack"><button class="btn btn--primary btn--lg btn--block" data-act="next">Start day ${S.day}</button></div>`;
@@ -297,12 +291,10 @@ function countUp(el){
   requestAnimationFrame(step);
 }
 function showShop(){
-  hideMenu(true);
   showModal(`${popupHead('Shop', `One-time upgrades for your stand. You have ${money(S.cash)}.`)}
     <div class="list">${UPG.map(upgradeRow).join('')}</div>`, { wide:true });
 }
 function showLocations(){
-  hideMenu(true);
   showModal(`${popupHead('Location', `Busier spots unlock as popularity grows. You're at ${S.pop}%.`)}
     <div class="list">${LOCS.map(locationRow).join('')}</div>`, { wide:true });
 }
@@ -314,7 +306,7 @@ document.addEventListener('click', e => {
   if (act === 'menu') { showMenu(); return; }
   if (act === 'closemenu') { hideMenu(); return; }
   if (act === 'dismiss') { if (modalDismiss) modalDismiss(); return; }
-  if (act === 'sel') { supplyItem = c; renderBoard(); return; }
+  if (act === 'sel') { supplyItem = a; renderBoard(); return; }
   if (act === 'showloc') { showLocations(); return; }
   if (act === 'shop') { showShop(); return; }
   if (act === 'buy') {
@@ -331,15 +323,14 @@ document.addEventListener('click', e => {
     else r[a] = clamp(r[a] + d, 0, a === 'i' ? 8 : 10);
     save(); renderAll(); return;
   }
-  if (act === 'upg') { const u = UPG.find(x => x.id === a); if (S.cash >= u.cost && !S.upg[a]) { addCash(-u.cost); S.capex = (S.capex || 0) + u.cost; S.upg[a] = true; S.upgLog[a] = { cost:u.cost, day:S.day }; sfx('upgrade'); save(); renderAll(); showShop(); } return; }
+  if (act === 'upg') { const u = UPG.find(x => x.id === a); if (S.cash >= u.cost && !S.upg[a]) { addCash(-u.cost); S.capex += u.cost; S.upg[a] = true; S.upgLog[a] = { cost:u.cost, day:S.day }; sfx('upgrade'); save(); renderAll(); showShop(); } return; }
   if (act === 'loc') { S.loc = a; sfx('tap'); save(); renderAll(); hideModal(); return; }
   if (act === 'open') { openStand(); return; }
   if (act === 'speed') { setSpeed(+a); return; }
   if (act === 'close') { if (sim) sim.min = DAY_MIN; return; }
   if (act === 'next') { hideModal(); tab = 'supplies'; renderAll(); return; }
-  if (act === 'help') { hideMenu(true); showHelp(); return; }
+  if (act === 'help') { showHelp(); return; }
   if (act === 'season') { showSeason(); return; }
-  if (act === 'closemodal') { hideModal(); renderAll(); return; }
   if (act === 'newgame') { confirmNewSeason(); return; }
   if (shellAction(act, a, c, b)) return;
 });
