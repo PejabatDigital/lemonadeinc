@@ -421,3 +421,14 @@ test('the books balance over many randomly played seasons', () => {
     assertNear(r.worstStock, 0, 1e-6);
   }
 });
+
+test('opening the stand records the stock it opened with', () => {
+  const r = loadGame().run(() => {
+    stockUp();
+    openStand();
+    const opening = sim.opening;
+    setSim(null);
+    return opening;
+  });
+  assert.deepEqual(r, { lemons: 500, sugar: 500, ice: 3000, cups: 500 });
+});

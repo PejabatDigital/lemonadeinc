@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { WORDER, WEATHER } from '../js/config.js';
-import { S, newState, buyPack, buyUpgrade, changeRecipe, lemonCount, useLemons, cupsReady, cupCost, unitCost, refCost, isStuck, addCash, idealIce, genForecast, normalize, seasonTotals } from '../js/state.js';
+import { S, setSim, newState, buyPack, buyUpgrade, changeRecipe, lemonCount, useLemons, cupsFrom, cupsReady, cupCost, unitCost, refCost, isStuck, addCash, idealIce, genForecast, normalize, seasonTotals } from '../js/state.js';
 import { loadGame, assertNear } from './load-game.js';
 
 test('buying stock averages the cost of everything you hold', () => {
@@ -192,4 +192,38 @@ test('season totals add up the ledger', () => {
   assert.equal(r.totals.waste, 2);
   assert.equal(r.totals.rent, 4);
   assertNear(r.totals.avgMargin, 12 / 40);
+});
+
+test('each item says how many cups it can make on the current recipe', () => {
+  const r = loadGame().run(() => {
+    S.recipe.l = 4; S.recipe.s = 5; S.recipe.i = 3;
+    S.lemons = [{ n: 9, age: 0 }]; S.sugar = 10; S.ice = 10; S.cups = 7;
+    const held = { lemons: cupsFrom('lemons'), sugar: cupsFrom('sugar'), ice: cupsFrom('ice'), cups: cupsFrom('cups') };
+    const ifBought = cupsFrom('lemons', 12);
+    S.upg.juicer = true;
+    const withJuicer = cupsFrom('lemons');
+    return { held, ifBought, withJuicer };
+  });
+  assert.deepEqual(r, { held: { lemons: 24, sugar: 24, ice: 3, cups: 7 }, ifBought: 36, withJuicer: 30 });
+});
+
+test('an ingredient the recipe leaves out never limits the cups', () => {
+  const r = loadGame().run(() => {
+    S.recipe.l = 0; S.recipe.s = 4; S.recipe.i = 0;
+    S.sugar = 8; S.cups = 100;
+    return { lemons: cupsFrom('lemons') === Infinity, ice: cupsFrom('ice') === Infinity, ready: cupsReady() };
+  });
+  assert.deepEqual(r, { lemons: true, ice: true, ready: 24 });
+});
+
+test('lemonade already in the pitcher counts towards the cups left', () => {
+  const r = loadGame().run(() => {
+    S.recipe.l = 4; S.recipe.s = 4;
+    S.lemons = [{ n: 2, age: 0 }]; S.sugar = 8; S.cups = 20;
+    setSim({ pitcher: 5 });
+    const out = { lemons: cupsFrom('lemons'), sugar: cupsFrom('sugar'), cups: cupsFrom('cups'), ready: cupsReady() };
+    setSim(null);
+    return out;
+  });
+  assert.deepEqual(r, { lemons: 5, sugar: 29, cups: 20, ready: 5 });
 });

@@ -2,7 +2,7 @@
    Board and popups: stats bar, tabs, Books, charts, day report, season report, shop, location, button handling.
    Title screen, menu, how-to-play, settings screen and confirm dialogs live in shell.js. */
 import { SEASON, DAY_MIN, BALANCE, LOCS, WEATHER, SHOP, UPG, FB, $, money, icon } from './config.js';
-import { S, sim, report, sum, cents, loc, locById, haveOf, yieldCups, lemonCount, cupCost, cupsReady, stockValue, seasonTotals, isStuck, save, buyPack, buyUpgrade, changeRecipe } from './state.js';
+import { S, sim, report, sum, cents, loc, locById, haveOf, yieldCups, cupCost, cupsFrom, cupsReady, stockValue, seasonTotals, isStuck, save, buyPack, buyUpgrade, changeRecipe } from './state.js';
 import { onSim, openStand } from './sim.js';
 import { saleFx } from './render.js';
 import { sfx, reducedMotion } from './settings.js';
@@ -53,6 +53,34 @@ function renderSceneStats(){
     <span class="scene-badge weather">${w.icon} ${temp}°C</span>
     <span class="scene-badge cash">${money(S.cash)}</span>`;
 }
+function stockNote(ready, limit){
+  const name = SHOP[limit].name.toLowerCase(), ice = cupsFrom('ice');
+  if (!ready) return `Need more ${name}.`;
+  let note = `Enough for ${ready}${sim ? ' more' : ''} cup${ready === 1 ? '' : 's'}, limited by ${name}.`;
+  if (sim && sim.pitcher) note += ` ${sim.pitcher} already mixed.`;
+  if (ice < ready) note += ` Ice covers ${ice}, the rest will be warm.`;
+  return note;
+}
+// Updates the cells in place instead of redrawing them, so the bars can slide down during the day.
+function renderStock(){
+  const el = $('#stock');
+  if (!el.firstChild) el.innerHTML = Object.entries(SHOP).map(([k, it]) => `<div class="stock-item" data-stock="${k}" role="img">
+    <span class="stock-count"><span aria-hidden="true">${it.icon}</span> <b></b></span><small></small><span class="stock-bar"><i></i></span></div>`).join('')
+    + '<p class="stock-note"></p>';
+  const ready = cupsReady(), limit = ['lemons', 'sugar', 'cups'].reduce((a, k) => cupsFrom(k) < cupsFrom(a) ? k : a);
+  el.classList.toggle('live', !!sim);
+  for (const k of Object.keys(SHOP)) {
+    const have = haveOf(k), makes = cupsFrom(k), what = makes === Infinity ? 'not used' : `makes ${makes}`;
+    const cell = el.querySelector(`[data-stock="${k}"]`), start = sim ? sim.opening[k] : 0;
+    cell.querySelector('b').textContent = have;
+    cell.querySelector('small').textContent = what;
+    cell.querySelector('i').style.width = start ? `${have / start * 100}%` : '0%';
+    cell.setAttribute('aria-label', `${SHOP[k].name}: ${have}, ${what}`);
+    cell.classList.toggle('is-limit', k === limit);
+    cell.classList.toggle('is-out', have === 0);
+  }
+  el.querySelector('.stock-note').textContent = stockNote(ready, limit);
+}
 // Redrawing replaces the buttons, so put keyboard focus back on the one that was pressed.
 function renderBoard(){
   const at = document.activeElement, act = at && at.closest('#board, #openBar') ? at.dataset.act : null;
@@ -71,8 +99,6 @@ function paintBoard(){
       <div><b class="${st.revenue - sim.cogs - sim.rent >= 0 ? 'good' : 'badc'}">${money(st.revenue - sim.cogs - sim.rent)}</b><span>profit so far (before waste)</span></div>
       <div><b>${money(st.revenue)}</b><span>taken today</span></div>
       <div><b>${sim.queue.length}</b><span>in line</span></div>
-      <div><b>${lemonCount()} / ${S.sugar}</b><span>lemons / sugar left</span></div>
-      <div><b>${S.ice} / ${S.cups}</b><span>ice / cups left</span></div>
       </div>${sim.soldOut ? `<p class="warn warn--line">Out of ${sim.soldOut}! Customers are being turned away. Close early to restock tomorrow.</p>` : ''}`;
     return;
   }
@@ -227,7 +253,7 @@ function showSeason(){
   showModal(html, { wide:true, redraw:showSeason });
 }
 
-export function renderAll(){ renderStats(); renderSceneStats(); renderBoard(); }
+export function renderAll(){ renderStats(); renderSceneStats(); renderStock(); renderBoard(); }
 
 function setSpeed(n){
   if (!sim) return; sim.speed = n;
@@ -275,6 +301,29 @@ function countUp(el){
   const step = now => { const p = Math.min(1, (now - t0) / 800), e = 1 - Math.pow(1 - p, 3); el.textContent = money(v * e); if (p < 1) requestAnimationFrame(step); };
   requestAnimationFrame(step);
 }
+// Spells out what a pack changes, so the player can judge it before the money goes.
+let buyAskedAt = 0;
+function askBuy(k, i){
+  const it = SHOP[k], [n, p] = it.packs[i], have = haveOf(k), each = p / n;
+  const saving = 1 - each / (it.packs[0][1] / it.packs[0][0]);
+  const before = cupsFrom(k), best = Math.max(0, ...S.ledger.map(r => r.sold));
+  buyAskedAt = performance.now();
+  showModal(`${popupHead(`Buy ${n} ${it.units}?`, `${money(p)}, ${cents(each)} each${saving > 0.005 ? ` (${Math.round(saving * 100)}% off the smallest pack)` : ''}`, false)}
+    <dl class="tally">
+      <dt>${it.name} in stock</dt><dd>${have} → ${have + n}</dd>
+      ${k !== 'cups' && before !== Infinity ? `<dt>Makes</dt><dd>${before} → ${cupsFrom(k, have + n)} cups</dd>` : ''}
+      <dt>Cash</dt><dd>${money(S.cash)} → ${money(S.cash - p)}</dd>
+      ${best ? `<dt>Your best day so far</dt><dd>${best} cups sold</dd>` : ''}
+    </dl>
+    <p class="sub sub--tight">${it.note}</p>
+    <div class="btn-stack"><button class="btn btn--primary btn--lg btn--block" data-act="buyyes:${k}:${i}">Confirm</button>
+    <button class="btn btn--secondary btn--lg btn--block" data-act="dismiss">Cancel</button></div>`);
+}
+function confirmBuy(k, i){
+  if (performance.now() - buyAskedAt < 300) return; // the second tap of a double-tap can land on Confirm
+  hideModal();
+  if (buyPack(k, +i)) { sfx('buy'); save(); renderAll(); }
+}
 function showShop(){
   showModal(`${popupHead('Shop', `One-time upgrades for your stand. You have ${money(S.cash)}.`)}
     <div class="list">${UPG.map(upgradeRow).join('')}</div>`, { wide:true });
@@ -291,7 +340,8 @@ export const ACTIONS = {
   sel(item){ supplyItem = item; renderBoard(); },
   showloc: showLocations,
   shop: showShop,
-  buy(item, pack){ if (buyPack(item, +pack)) { sfx('buy'); save(); renderAll(); } },
+  buy(item, pack){ askBuy(item, +pack); },
+  buyyes: confirmBuy,
   rec(key, dir){ changeRecipe(key, +dir); save(); renderAll(); },
   upg(id){ if (buyUpgrade(id)) { sfx('upgrade'); save(); renderAll(); showShop(); } },
   loc(id){ S.loc = id; sfx('tap'); save(); renderAll(); hideModal(); },

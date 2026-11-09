@@ -185,6 +185,19 @@ canvas{ display:block; width:100%; height:100%; }
 .paused-badge span{ background:var(--glass); color:#fff; border-radius:var(--r-pill); padding:8px 18px; font-family:var(--font-display); font-weight:800; font-size:22px; }
 body.is-paused .paused-badge{ display:grid; }
 
+/* Stock strip: what's on hand and how many cups it makes. The bars show what's left of the day's opening stock. */
+.stock{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:var(--s-2); margin-top:var(--s-3); }
+.stock-item{ background:var(--bg-surface); border:1px solid var(--border-default); border-radius:var(--r-sm); padding:6px var(--s-2); text-align:center; font-variant-numeric:tabular-nums; }
+.stock-item.is-limit{ border-color:transparent; box-shadow:inset 0 0 0 2px var(--accent-edge); }
+.stock-count{ display:block; font-family:var(--font-display); font-size:20px; font-weight:800; line-height:1.15; white-space:nowrap; }
+.stock-count b{ font-weight:800; }
+.stock-item.is-out b{ color:var(--status-negative); }
+.stock-item small{ display:block; color:var(--text-muted); font-size:13px; font-weight:700; white-space:nowrap; }
+.stock-bar{ display:none; height:6px; margin-top:var(--s-1); border-radius:3px; background:var(--border-default); overflow:hidden; }
+.stock.live .stock-bar{ display:block; }
+.stock-bar i{ display:block; height:100%; background:var(--leaf-600); transition:width .25s linear; }
+.stock-note{ grid-column:1/-1; margin:0; color:var(--text-muted); font-size:14px; font-weight:700; text-align:center; }
+
 .open-bar{ display:none; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px 16px; margin:14px 0; }
 .open-bar.on{ display:flex; }
 .loc-badge{ display:inline-flex; align-items:center; gap:6px; min-height:var(--h-md); background:var(--bg-surface); border:0; box-shadow:inset 0 0 0 1.5px var(--border-default); border-radius:var(--r-pill); padding:0 18px 0 14px; font-weight:800; color:var(--text-primary); }
@@ -226,7 +239,7 @@ body.is-paused .paused-badge{ display:grid; }
 .tiles div{ background:rgba(var(--chalk-50-rgb),.08); border-radius:var(--r-sm); padding:8px 10px; }
 .tiles b{ display:block; font-family:var(--font-display); font-size:22px; line-height:1.15; font-variant-numeric:tabular-nums; }
 .tiles span{ color:var(--board-ink-soft); font-size:13px; }
-.tiles--live{ grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); margin-bottom:0; }
+.tiles--live{ grid-template-columns:repeat(2,minmax(0,1fr)); margin-bottom:0; }
 .tiles--live b{ font-size:24px; line-height:1.1; }
 .tiles--live span{ font-size:14px; }
 .charts{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:var(--s-3); margin-bottom:14px; }
@@ -334,7 +347,7 @@ dialog[open]::backdrop{ opacity:1; }
   .top{ grid-area:top; }
   .board{ grid-area:board; margin-top:0; }
   .stage{ grid-area:stage; position:sticky; top:12px; }
-  .scene{ aspect-ratio:1/1; max-height:calc(100dvh - 110px); }
+  .scene{ aspect-ratio:1/1; max-height:calc(100dvh - 220px); } /* leaves room for the stock strip and open bar */
   .open-bar{ margin:12px 0 0; }
   .sup-ico{ font-size:1em; margin-right:6px; }
 }
@@ -344,6 +357,7 @@ dialog[open]::backdrop{ opacity:1; }
   .stat{ padding:4px 9px; font-size:14px; flex:0 0 auto; }
   .stat .meter{ display:none; }
   .scene{ aspect-ratio:3/4; }
+  .stock{ gap:6px; } .stock-item{ padding:6px var(--s-1); } .stock-count{ font-size:18px; } .stock-item small{ font-size:12px; }
   .tabs{ gap:5px; } .tabs button{ flex:1 1 auto; padding:0 8px; }
   .card{ padding:var(--s-4); }
   .popup-head h2{ font-size:26px; }

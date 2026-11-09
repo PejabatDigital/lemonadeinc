@@ -66,11 +66,17 @@ export function normalize(d){
   return d;
 }
 
-export function cupsReady(){
-  const { l, s } = S.recipe;
-  const pitchers = Math.min(l > 0 ? Math.floor(lemonCount()/l) : Infinity, s > 0 ? Math.floor(S.sugar/s) : Infinity);
-  return Math.min(pitchers * yieldCups(), S.cups);
+// How many cups qty of an item can make on the current recipe, counting a pitcher already mixed. Infinity if the recipe doesn't use it.
+export function cupsFrom(k, qty = haveOf(k)){
+  const { l, s, i } = S.recipe, mixed = sim ? sim.pitcher : 0;
+  const pitchers = per => per > 0 ? Math.floor(qty/per) * yieldCups() + mixed : Infinity;
+  if (k === 'lemons') return pitchers(l);
+  if (k === 'sugar') return pitchers(s);
+  if (k === 'ice') return i > 0 ? Math.floor(qty/i) : Infinity;
+  return qty;
 }
+// Ice isn't counted: without it the stand can still sell, just warm.
+export const cupsReady = () => Math.min(cupsFrom('lemons'), cupsFrom('sugar'), cupsFrom('cups'));
 // Out of cups with no way to buy more. Any other shortage can be worked around by changing the recipe.
 export const isStuck = () => S.cups <= 0 && S.cash < Math.min(...SHOP.cups.packs.map(p => p[1]));
 export function useLemons(n){

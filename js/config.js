@@ -37,10 +37,10 @@ const SUGAR_CUBE = `<svg class="ico" viewBox="0 0 32 32" aria-hidden="true"><g s
   <path d="M16 4 28 10 16 16 4 10Z" fill="#FFFFFF"/><path d="M4 10 16 16 16 29 4 23Z" fill="#E4EAED"/><path d="M16 16 28 10 28 23 16 29Z" fill="#C7D1D6"/></g>
   <g fill="#AEBBC2"><circle cx="9" cy="16" r=".9"/><circle cx="12" cy="21" r=".9"/><circle cx="21" cy="19" r=".9"/><circle cx="24" cy="15" r=".9"/><circle cx="14" cy="9" r=".9"/><circle cx="19" cy="11" r=".9"/></g></svg>`;
 export const SHOP = {
-  lemons: { name:'Lemons', icon:'🍋', note:`Go bad after ${BALANCE.lemonLife} days.`, packs:[[12,3.00],[40,8.80],[100,19.00]] },
-  sugar:  { name:'Sugar', icon:SUGAR_CUBE, note:'Measured in cups. Keeps forever.', packs:[[10,1.80],[35,5.60],[90,12.60]] },
-  ice:    { name:'Ice cubes', icon:'🧊', note:'Melts overnight.', packs:[[50,1.00],[200,3.40],[500,7.50]] },
-  cups:   { name:'Paper cups', icon:'🥤', note:'One per customer.', packs:[[50,1.50],[150,3.90],[400,9.00]] },
+  lemons: { name:'Lemons', units:'lemons', icon:'🍋', note:`Go bad after ${BALANCE.lemonLife} days.`, packs:[[12,3.00],[40,8.80],[100,19.00]] },
+  sugar:  { name:'Sugar', units:'cups of sugar', icon:SUGAR_CUBE, note:'Measured in cups. Keeps forever.', packs:[[10,1.80],[35,5.60],[90,12.60]] },
+  ice:    { name:'Ice cubes', units:'ice cubes', icon:'🧊', note:'Melts overnight.', packs:[[50,1.00],[200,3.40],[500,7.50]] },
+  cups:   { name:'Paper cups', units:'paper cups', icon:'🥤', note:'One per customer.', packs:[[50,1.50],[150,3.90],[400,9.00]] },
 };
 export const UPG = [
   { id:'cooler',   name:'Ice cooler',    icon:'🧊', cost:40, desc:'Keeps half your ice overnight.' },

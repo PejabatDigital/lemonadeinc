@@ -1,7 +1,7 @@
 /* Lemonade Inc. | sim.js
    The trading day: customers deciding, queueing, taste scoring, and the end-of-day books. */
-import { W, STAND_X, QY, DAY_MIN, SEASON, BALANCE, WEATHER, FB, TIPS, clamp, rng } from './config.js';
-import { S, sim, report, setSim, setReport, genForecast, loc, idealIce, yieldCups, lemonCount, useLemons, addCash, sum, stockValue, isStuck, save } from './state.js';
+import { W, STAND_X, QY, DAY_MIN, SEASON, BALANCE, WEATHER, SHOP, FB, TIPS, clamp, rng } from './config.js';
+import { S, sim, report, setSim, setReport, genForecast, loc, idealIce, yieldCups, lemonCount, haveOf, useLemons, addCash, sum, stockValue, isStuck, save } from './state.js';
 
 // The sim never touches the page. It announces 'open', 'sale' and 'end', and ui.js and shell.js react.
 const simListeners = {};
@@ -20,6 +20,7 @@ export function openStand(){
     N: L.traffic * WEATHER[type].traffic * (1 + S.pop/150) * (S.upg.sign ? BALANCE.signTraffic : 1),
     maxPrice: L.tol * (0.55 + 0.55*tf) * (0.85 + S.pop/300),
     rent:L.rent, soldOut:null, popDelta:0, cogs:0, pcpc:0,
+    opening:Object.fromEntries(Object.keys(SHOP).map(k => [k, haveOf(k)])),
     stats:{ seen:0, sold:0, revenue:0, fb:{} },
   });
   emit('open');
